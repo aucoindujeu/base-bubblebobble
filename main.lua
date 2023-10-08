@@ -1,99 +1,109 @@
 GRAVITE = 9.81
 VENT = 0
-TAILLE_BLOC = 50
-JOUEUR_TAILLEX = 50
-JOUEUR_TAILLEY = 50
-JOUEUR_VITESSE = 300
-JOUEUR_VITESSE_SAUT = -300
-JOUEUR_VITESSE_CHUTE_MAX = 600
-JOUEUR_HITBOX = nil
-JOUEUR_SURLESOL = false
-JOUEUR = nil
+IMAGES = {
+    joueur = love.graphics.newImage("images/joueur.png"),
+    bloc = love.graphics.newImage("images/bloc.png")
+}
+
+-- hauteur/largeur relativement à un bloc
+JOUEUR_TAILLE_X = 1.5
+JOUEUR_TAILLE_Y = 1.5
+
+JOUEUR_VITESSE = 5
+JOUEUR_VITESSE_SAUT = 5
+JOUEUR_VITESSE_CHUTE_MAX = 10
+
+JOUEUR = {
+    x = 0,
+    y = 0,
+    vx = 0,
+    vy = 0
+}
 NIVEAU = {
     blocs = {},
     tailleY = 0
 }
-IMAGES = {
-    joueur =  love.graphics.newImage("images/joueur.png"),
-    bloc = love.graphics.newImage("images/bloc.png")
-}
-MONDE = nil
+
+-- On considère que les blocs sont de taille 1x1. Quand on les dessine, ils ont cette
+-- taille.
+ECHELLE_DESSIN = 50
 
 function love.load()
     -- fenêtre
     local longueurFenetre, hauteurFenetre = love.window.getDesktopDimensions()
     love.window.setMode(longueurFenetre, hauteurFenetre)
 
-    -- monde et gravité
-    love.physics.setMeter(64) -- 1 mètre = 64 pixels
-    MONDE = love.physics.newWorld(VENT * 64, GRAVITE * 64)
-
     -- niveau
-    local niveau = chargerNiveaux("niveaux/niveau_1.txt")
-    local joueurPositionDebutX = 0
-    local joueurPositionDebutY = 0
-    for y, ligne in ipairs(niveau) do
-        NIVEAU.tailleY = math.max(NIVEAU.tailleY, y)
-        for x, caractere in ipairs(ligne) do
-            if caractere == "x" then
-                table.insert(
-                    NIVEAU.blocs,
-                    creerObjetPhysique(
-                        x * TAILLE_BLOC, y * TAILLE_BLOC,
-                        TAILLE_BLOC, TAILLE_BLOC,
-                        "static"
-                    )
-                )
-            elseif caractere == "j" then
-                joueurPositionDebutX = x * TAILLE_BLOC
-                joueurPositionDebutY = y * TAILLE_BLOC
-            end
-        end
-    end
-
-    -- joueur
-    JOUEUR = creerObjetPhysique(
-        joueurPositionDebutX, joueurPositionDebutY,
-        JOUEUR_TAILLEX, JOUEUR_TAILLEY,
-        "dynamic"
-    )
-    JOUEUR.corps:setFixedRotation(true)
+    NIVEAU = chargerNiveau("niveaux/niveau_1.txt")
+    JOUEUR.x = NIVEAU.positionDepartJoueur.x
+    JOUEUR.y = NIVEAU.positionDepartJoueur.y
 end
 
 function love.update(dt)
     bougerJoueur(dt)
-    MONDE:update(dt)
 end
 
 function bougerJoueur(dt)
-    local vx = 0
-
+    -- TODO contrôle à la manette
     -- bouger à gauche et à droite
+    JOUEUR.vx = 0
     if love.keyboard.isDown("right") then
-        vx = vx + JOUEUR_VITESSE
+        JOUEUR.vx = JOUEUR.vx + JOUEUR_VITESSE
     end
     if love.keyboard.isDown("left") then
-        vx = vx - JOUEUR_VITESSE
+        JOUEUR.vx = JOUEUR.vx - JOUEUR_VITESSE
     end
 
     -- saut
-    local _, vy = JOUEUR.corps:getLinearVelocity()
     if love.keyboard.isDown("space") then
         -- TODO seulement quand le JOUEUR est sur le sol
-        vy = JOUEUR_VITESSE_SAUT
+        -- TODO comment sauter plus haut en fonction de la durée pendant laquelle on appuie?
+        JOUEUR.vy = -JOUEUR_VITESSE_SAUT
+    else
+        JOUEUR.vy = JOUEUR.vy + GRAVITE * dt
     end
 
-    -- vitesse de chute maximale
-    vy = math.min(math.max(vy, -JOUEUR_VITESSE_CHUTE_MAX), JOUEUR_VITESSE_CHUTE_MAX)
-    JOUEUR.corps:setLinearVelocity(vx, vy)
+    -- Vitesse de chute à ne pas dépasser
+    if JOUEUR.vy > JOUEUR_VITESSE_CHUTE_MAX then
+        JOUEUR.vy = JOUEUR_VITESSE_CHUTE_MAX
+    end
+
+    -- TODO collisions droite, gauche
+    -- Collision avec les blocs dessous/dessus
+    local minY = math.ceil(JOUEUR.y - JOUEUR_TAILLE_Y / 2 - 1 / 2)
+    local maxY = math.floor(JOUEUR.y + JOUEUR_TAILLE_Y / 2 + 1 / 2)
+    local minX = math.ceil(JOUEUR.x - JOUEUR_TAILLE_X / 2 - 1 / 2)
+    local maxX = math.floor(JOUEUR.x + JOUEUR_TAILLE_X / 2 + 1 / 2)
+    for y = math.max(minY, 1), math.min(maxY, #NIVEAU.blocs) do
+        for x = math.max(minX, 1), math.min(maxX, #NIVEAU.blocs[y]) do
+            if NIVEAU.blocs[y][x] == 1 then     -- il y a un bloc
+                -- bloc de droite
+                if testCollisionJoueurBloc(x, y) and JOUEUR.vx > 0 and x > JOUEUR.x then
+                    JOUEUR.vx = 0
+                    JOUEUR.x = x - JOUEUR_TAILLE_X / 2 - 1 / 2
+                end
+                -- bloc de dessous
+                if testCollisionJoueurBloc(x, y) and JOUEUR.vy > 0 and y > JOUEUR.y then
+                    JOUEUR.vy = 0
+                    JOUEUR.y = y - JOUEUR_TAILLE_Y / 2 - 1 / 2
+                end
+            end
+        end
+    end
+
+    -- déplacement
+    JOUEUR.x = JOUEUR.x + JOUEUR.vx * dt
+    JOUEUR.y = JOUEUR.y + JOUEUR.vy * dt
 
     -- quand le joueur tombe, on le fait remonter
-    local maxY = (NIVEAU.tailleY + 1) * TAILLE_BLOC
-    while JOUEUR.corps:getY() > maxY do
-        JOUEUR.corps:setY(JOUEUR.corps:getY() - maxY)
+    while JOUEUR.y > #NIVEAU.blocs do
+        JOUEUR.y = JOUEUR.y - #NIVEAU.blocs
     end
+end
 
-    -- print(JOUEUR.corps:getY())
+function testCollisionJoueurBloc(x, y)
+    -- retourne "true" si le joueur est à distance de collision du bloc de coordonnées (x,y)
+    return math.abs(x - JOUEUR.x) < JOUEUR_TAILLE_X / 2 + 1 / 2 and math.abs(y - JOUEUR.y) < JOUEUR_TAILLE_Y / 2 + 1 / 2
 end
 
 function love.draw()
@@ -104,23 +114,25 @@ end
 function dessinerJoueur()
     love.graphics.draw(
         IMAGES.joueur,
-        JOUEUR.corps:getX() - JOUEUR_TAILLEX / 2,
-        JOUEUR.corps:getY() - JOUEUR_TAILLEY / 2,
-        0, -- orientation
-        JOUEUR_TAILLEX / IMAGES.joueur:getWidth(), -- scaleX
-        JOUEUR_TAILLEY / IMAGES.joueur:getHeight() -- scaleY
+        (JOUEUR.x - JOUEUR_TAILLE_X / 2) * ECHELLE_DESSIN,
+        (JOUEUR.y - JOUEUR_TAILLE_Y / 2) * ECHELLE_DESSIN,
+        0,                                                             -- orientation
+        (JOUEUR_TAILLE_X / IMAGES.joueur:getWidth()) * ECHELLE_DESSIN, -- scaleX
+        (JOUEUR_TAILLE_Y / IMAGES.joueur:getHeight()) * ECHELLE_DESSIN -- scaleY
     )
-    -- TODO for some strange reason, player sometimes gets stuck on the ground
-    print(JOUEUR.corps:getY())
 end
 
 function dessinerNiveau()
-    for b = 1, #NIVEAU.blocs do
-        love.graphics.draw(
-            IMAGES.bloc,
-            NIVEAU.blocs[b].corps:getX() - TAILLE_BLOC / 2,
-            NIVEAU.blocs[b].corps:getY() - TAILLE_BLOC / 2
-        )
+    for y = 1, #NIVEAU.blocs do
+        for x = 1, #NIVEAU.blocs[y] do
+            if NIVEAU.blocs[y][x] == 1 then
+                love.graphics.draw(
+                    IMAGES.bloc,
+                    (x - 1 / 2) * ECHELLE_DESSIN,
+                    (y - 1 / 2) * ECHELLE_DESSIN
+                )
+            end
+        end
     end
 end
 
@@ -130,29 +142,27 @@ function love.keypressed(touche)
     end
 end
 
-function coordonnees(hitbox)
-    return hitbox.corps:getX(), hitbox.corps:getY()
-end
-
-function creerObjetPhysique(x, y, tailleX, tailleY, type)
-    local objet = {
-        corps = love.physics.newBody(MONDE, x, y, type),
-        forme = love.physics.newRectangleShape(tailleX, tailleY)
+function chargerNiveau(path)
+    local niveau = {
+        blocs = {},
+        positionDepartJoueur = {
+            x = 0,
+            y = 0
+        }
     }
-    objet.fixture = love.physics.newFixture(objet.corps, objet.forme)
-    objet.fixture:setFriction(0)
-    return objet
-end
-
-function chargerNiveaux(path)
-    local niveau = {}
     local y = 1
     for line in love.filesystem.lines(path) do
-        niveau[y] = {}
-        local x = 1
-        for s in line:gmatch(".") do
-            niveau[y][x] = s
-            x = x + 1
+        niveau.blocs[y] = {}
+        for x = 1, #line do
+            local caractere = line:sub(x, x)
+            if caractere == "x" then
+                niveau.blocs[y][x] = 1
+            elseif caractere == "j" then
+                niveau.positionDepartJoueur.x = x
+                niveau.positionDepartJoueur.y = y
+            else
+                niveau.blocs[y][x] = 0
+            end
         end
         y = y + 1
     end
