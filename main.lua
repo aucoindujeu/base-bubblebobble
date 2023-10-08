@@ -31,7 +31,10 @@ ECHELLE_DESSIN = 50
 function love.load()
     -- fenêtre
     local longueurFenetre, hauteurFenetre = love.window.getDesktopDimensions()
-    love.window.setMode(longueurFenetre, hauteurFenetre)
+    love.window.setMode(
+        longueurFenetre, hauteurFenetre,
+        { resizable = true }
+    )
 
     -- niveau
     NIVEAU = chargerNiveau("niveaux/niveau_1.txt")
@@ -68,24 +71,33 @@ function bougerJoueur(dt)
         JOUEUR.vy = JOUEUR_VITESSE_CHUTE_MAX
     end
 
-    -- TODO collisions droite, gauche
-    -- Collision avec les blocs dessous/dessus
-    local minY = math.ceil(JOUEUR.y - JOUEUR_TAILLE_Y / 2 - 1 / 2)
-    local maxY = math.floor(JOUEUR.y + JOUEUR_TAILLE_Y / 2 + 1 / 2)
-    local minX = math.ceil(JOUEUR.x - JOUEUR_TAILLE_X / 2 - 1 / 2)
-    local maxX = math.floor(JOUEUR.x + JOUEUR_TAILLE_X / 2 + 1 / 2)
-    for y = math.max(minY, 1), math.min(maxY, #NIVEAU.blocs) do
-        for x = math.max(minX, 1), math.min(maxX, #NIVEAU.blocs[y]) do
-            if NIVEAU.blocs[y][x] == 1 then     -- il y a un bloc
-                -- bloc de droite
-                if testCollisionJoueurBloc(x, y) and JOUEUR.vx > 0 and x > JOUEUR.x then
-                    JOUEUR.vx = 0
-                    JOUEUR.x = x - JOUEUR_TAILLE_X / 2 - 1 / 2
-                end
-                -- bloc de dessous
-                if testCollisionJoueurBloc(x, y) and JOUEUR.vy > 0 and y > JOUEUR.y then
-                    JOUEUR.vy = 0
-                    JOUEUR.y = y - JOUEUR_TAILLE_Y / 2 - 1 / 2
+    -- TODO collisions droite/gauche
+    for y, ligne in ipairs(NIVEAU.blocs) do
+        for x, bloc in ipairs(ligne) do
+            if bloc == 1 then                                                                   -- il y a un obstacle
+                if JOUEUR.vy ~= 0 and math.abs(JOUEUR.x - x) < JOUEUR_TAILLE_X / 2 + 1 / 2 then -- alignement vertical
+                    -- TODO ça marche mais c'est illisible...
+                    local distanceDebut = 0
+                    local distanceFin = 0
+                    local limitVy = 0
+                    if JOUEUR.vy > 0 then -- test collision avec bloc en dessous
+                        distanceDebut = y - 1 / 2 - JOUEUR_TAILLE_Y / 2 - JOUEUR.y
+                        distanceFin = distanceDebut - JOUEUR.vy * dt
+                        limitVy = distanceDebut/dt
+                        -- if -JOUEUR.y - JOUEUR_TAILLE_Y / 2 + y - 1 / 2 >= 0 and -JOUEUR.y - JOUEUR_TAILLE_Y / 2 - JOUEUR.vy * dt + y - 1 / 2 < 0 then
+                        -- JOUEUR.vy = (y - 1 / 2 - JOUEUR_TAILLE_Y / 2 - JOUEUR.y) / dt
+                        -- end
+                    else -- test collision avec bloc au dessus TODO comment simplifier ces deux opérations quasi identiques?
+                        distanceDebut = JOUEUR.y - JOUEUR_TAILLE_Y / 2 - 1 / 2 - y
+                        distanceFin = distanceDebut + JOUEUR.vy * dt
+                        limitVy = -distanceDebut/dt
+                        -- if JOUEUR.y - JOUEUR_TAILLE_Y / 2 - y - 1 / 2 >= 0 and JOUEUR.y - JOUEUR_TAILLE_Y / 2 + JOUEUR.vy * dt - y - 1 / 2 < 0 then
+                            -- JOUEUR.vy = (y + 1 / 2 + JOUEUR_TAILLE_Y / 2 - JOUEUR.y) / dt
+                        -- end
+                    end
+                    if distanceDebut >= 0 and distanceFin < 0 then
+                        JOUEUR.vy = limitVy
+                    end
                 end
             end
         end
