@@ -57,13 +57,14 @@ function bougerJoueur(dt)
         JOUEUR.vx = JOUEUR.vx - JOUEUR_VITESSE
     end
 
+    -- Gravité
+    JOUEUR.vy = JOUEUR.vy + GRAVITE * dt
+
     -- saut
-    if love.keyboard.isDown("space") then
-        -- TODO seulement quand le JOUEUR est sur le sol
+    local joueurSurLeSol = testJoueurSurLeSol()
+    if love.keyboard.isDown("space") and joueurSurLeSol then
         -- TODO comment sauter plus haut en fonction de la durée pendant laquelle on appuie?
         JOUEUR.vy = -JOUEUR_VITESSE_SAUT
-    else
-        JOUEUR.vy = JOUEUR.vy + GRAVITE * dt
     end
 
     -- Vitesse de chute à ne pas dépasser
@@ -127,6 +128,24 @@ function testCollision(x1, y1, sx1, sy1, x2, y2, sx2, sy2)
         return false
     end
     return true
+end
+
+function testJoueurSurLeSol()
+    -- est-ce que le joueur est sur le sol?
+    local solY = math.floor(JOUEUR.y + JOUEUR_TAILLE_Y / 2 + 1 / 2)
+    if solY < 1 or solY > #NIVEAU.blocs then
+        return false
+    end
+    local minX = math.max(1, math.ceil(JOUEUR.x - JOUEUR_TAILLE_X / 2 - 1 / 2))
+    local maxX = math.min(#NIVEAU.blocs[solY], math.floor(JOUEUR.x + JOUEUR_TAILLE_X / 2 + 1 / 2))
+    for solX = minX, maxX do
+        if math.abs(solX - JOUEUR.x) < JOUEUR_TAILLE_X / 2 + 1 / 2 then
+            if NIVEAU.blocs[solY][solX] == 1 then
+                return true
+            end
+        end
+    end
+    return false
 end
 
 function love.draw()
