@@ -71,33 +71,38 @@ function bougerJoueur(dt)
         JOUEUR.vy = JOUEUR_VITESSE_CHUTE_MAX
     end
 
-    -- TODO collisions droite/gauche
+    -- collisions
     for y, ligne in ipairs(NIVEAU.blocs) do
         for x, bloc in ipairs(ligne) do
-            if bloc == 1 then                                                                   -- il y a un obstacle
-                if JOUEUR.vy ~= 0 and math.abs(JOUEUR.x - x) < JOUEUR_TAILLE_X / 2 + 1 / 2 then -- alignement vertical
-                    -- TODO ça marche mais c'est illisible...
-                    local distanceDebut = 0
-                    local distanceFin = 0
-                    local limitVy = 0
-                    if JOUEUR.vy > 0 then -- test collision avec bloc en dessous
-                        distanceDebut = y - 1 / 2 - JOUEUR_TAILLE_Y / 2 - JOUEUR.y
-                        distanceFin = distanceDebut - JOUEUR.vy * dt
-                        limitVy = distanceDebut/dt
-                        -- if -JOUEUR.y - JOUEUR_TAILLE_Y / 2 + y - 1 / 2 >= 0 and -JOUEUR.y - JOUEUR_TAILLE_Y / 2 - JOUEUR.vy * dt + y - 1 / 2 < 0 then
-                        -- JOUEUR.vy = (y - 1 / 2 - JOUEUR_TAILLE_Y / 2 - JOUEUR.y) / dt
-                        -- end
-                    else -- test collision avec bloc au dessus TODO comment simplifier ces deux opérations quasi identiques?
-                        distanceDebut = JOUEUR.y - JOUEUR_TAILLE_Y / 2 - 1 / 2 - y
-                        distanceFin = distanceDebut + JOUEUR.vy * dt
-                        limitVy = -distanceDebut/dt
-                        -- if JOUEUR.y - JOUEUR_TAILLE_Y / 2 - y - 1 / 2 >= 0 and JOUEUR.y - JOUEUR_TAILLE_Y / 2 + JOUEUR.vy * dt - y - 1 / 2 < 0 then
-                            -- JOUEUR.vy = (y + 1 / 2 + JOUEUR_TAILLE_Y / 2 - JOUEUR.y) / dt
-                        -- end
-                    end
-                    if distanceDebut >= 0 and distanceFin < 0 then
-                        JOUEUR.vy = limitVy
-                    end
+            if bloc == 1 then
+                -- est-ce qu'il y a collision?
+                if JOUEUR.vy > 0 and testCollision( -- dessous
+                        JOUEUR.x, JOUEUR.y + JOUEUR_TAILLE_Y / 2 + JOUEUR.vy * dt / 2,
+                        JOUEUR_TAILLE_X, JOUEUR.vy * dt,
+                        x, y, 1, 1
+                    ) then
+                    JOUEUR.vy = (y - 1 / 2 - JOUEUR_TAILLE_Y / 2 - JOUEUR.y) / dt
+                end
+                if JOUEUR.vy < 0 and testCollision( -- dessus
+                        JOUEUR.x, JOUEUR.y - JOUEUR_TAILLE_Y / 2 + JOUEUR.vy * dt / 2,
+                        JOUEUR_TAILLE_X, -JOUEUR.vy * dt,
+                        x, y, 1, 1
+                    ) then
+                    JOUEUR.vy = (y + 1 / 2 + JOUEUR_TAILLE_Y / 2 - JOUEUR.y) / dt
+                end
+                if JOUEUR.vx > 0 and testCollision( -- droite
+                        JOUEUR.x + JOUEUR_TAILLE_X / 2 + JOUEUR.vx * dt / 2, JOUEUR.y,
+                        JOUEUR.vx * dt, JOUEUR_TAILLE_Y,
+                        x, y, 1, 1
+                    ) then
+                    JOUEUR.vx = (x - 1 / 2 - JOUEUR_TAILLE_X / 2 - JOUEUR.x) / dt
+                end
+                if JOUEUR.vx < 0 and testCollision( -- gauche
+                        JOUEUR.x - JOUEUR_TAILLE_X / 2 + JOUEUR.vx * dt / 2, JOUEUR.y,
+                        -JOUEUR.vx * dt, JOUEUR_TAILLE_Y,
+                        x, y, 1, 1
+                    ) then
+                    JOUEUR.vx = (x + 1 / 2 + JOUEUR_TAILLE_X / 2 - JOUEUR.x) / dt
                 end
             end
         end
@@ -113,9 +118,15 @@ function bougerJoueur(dt)
     end
 end
 
-function testCollisionJoueurBloc(x, y)
-    -- retourne "true" si le joueur est à distance de collision du bloc de coordonnées (x,y)
-    return math.abs(x - JOUEUR.x) < JOUEUR_TAILLE_X / 2 + 1 / 2 and math.abs(y - JOUEUR.y) < JOUEUR_TAILLE_Y / 2 + 1 / 2
+function testCollision(x1, y1, sx1, sy1, x2, y2, sx2, sy2)
+    -- retourne "true" si les deux rectangles se superposent
+    if x1 + sx1 / 2 <= x2 - sx2 / 2 or x2 + sx2 / 2 <= x1 - sx1 / 2 then
+        return false
+    end
+    if y1 + sy1 / 2 <= y2 - sy2 / 2 or y2 + sy2 / 2 <= y1 - sy1 / 2 then
+        return false
+    end
+    return true
 end
 
 function love.draw()
