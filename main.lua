@@ -19,10 +19,7 @@ JOUEUR = {
     vx = 0,
     vy = 0
 }
-NIVEAU = {
-    blocs = {},
-    tailleY = 0
-}
+NIVEAU = {}
 
 -- On considère que les blocs sont de taille 1x1. Quand on les dessine, ils ont cette
 -- taille.
@@ -113,6 +110,9 @@ function bougerJoueur(dt)
     JOUEUR.x = JOUEUR.x + JOUEUR.vx * dt
     JOUEUR.y = JOUEUR.y + JOUEUR.vy * dt
 
+    -- on garde le joueur dans les bornes du terrain
+    JOUEUR.x = math.min(NIVEAU.tailleX, math.max(1, JOUEUR.x))
+
     -- quand le joueur tombe, on le fait remonter
     while JOUEUR.y > #NIVEAU.blocs do
         JOUEUR.y = JOUEUR.y - #NIVEAU.blocs
@@ -190,7 +190,8 @@ function chargerNiveau(path)
         positionDepartJoueur = {
             x = 0,
             y = 0
-        }
+        },
+        tailleX = 0
     }
     local y = 1
     for line in love.filesystem.lines(path) do
@@ -205,6 +206,7 @@ function chargerNiveau(path)
             else
                 niveau.blocs[y][x] = 0
             end
+            niveau.tailleX = math.max(niveau.tailleX, x)
         end
         y = y + 1
     end
