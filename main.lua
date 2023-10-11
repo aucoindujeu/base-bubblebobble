@@ -1,4 +1,4 @@
-GRAVITE = 9.81
+GRAVITE = 9.81 * 7
 VENT = 0
 IMAGES = {
     joueur = love.graphics.newImage("images/joueur.png"),
@@ -9,8 +9,8 @@ IMAGES = {
 JOUEUR_TAILLE_X = 1.5
 JOUEUR_TAILLE_Y = 1.5
 
-JOUEUR_VITESSE = 5
-JOUEUR_VITESSE_SAUT = 5
+JOUEUR_VITESSE = 8
+JOUEUR_VITESSE_SAUT = 20
 JOUEUR_VITESSE_CHUTE_MAX = 10
 
 JOUEUR = {
@@ -171,7 +171,11 @@ function dessinerNiveau()
                 love.graphics.draw(
                     IMAGES.bloc,
                     (x - 1 / 2) * ECHELLE_DESSIN,
-                    (y - 1 / 2) * ECHELLE_DESSIN
+                    (y - 1 / 2) * ECHELLE_DESSIN,
+                    0,
+                    (1 / IMAGES.bloc:getWidth()) * ECHELLE_DESSIN,
+                    (1 / IMAGES.bloc:getHeight()) * ECHELLE_DESSIN
+
                 )
             end
         end
