@@ -4,6 +4,7 @@ IMAGES = {
     joueur = love.graphics.newImage("images/joueur.png"),
     bloc = love.graphics.newImage("images/bloc.png")
 }
+JOYSTICKS = { nil, nil }
 
 -- hauteur/largeur relativement à un bloc
 JOUEUR_TAILLE_X = 1.5
@@ -39,6 +40,16 @@ function love.load()
     JOUEUR.y = NIVEAU.positionDepartJoueur.y
 end
 
+function love.joystickadded(joystick)
+    if not JOYSTICKS[1] then
+        JOYSTICKS[1] = joystick
+        print("Connected joystick 1")
+    elseif not JOYSTICKS[2] then
+        JOYSTICKS[2] = joystick
+        print("Connected joystick 2")
+    end
+end
+
 function love.update(dt)
     bougerJoueur(dt)
 end
@@ -46,20 +57,14 @@ end
 function bougerJoueur(dt)
     -- TODO contrôle à la manette
     -- bouger à gauche et à droite
-    JOUEUR.vx = 0
-    if love.keyboard.isDown("right") then
-        JOUEUR.vx = JOUEUR.vx + JOUEUR_VITESSE
-    end
-    if love.keyboard.isDown("left") then
-        JOUEUR.vx = JOUEUR.vx - JOUEUR_VITESSE
-    end
+    JOUEUR.vx = lireVitesseJoueur(1)
 
     -- Gravité
     JOUEUR.vy = JOUEUR.vy + GRAVITE * dt
 
     -- saut
     local joueurSurLeSol = testJoueurSurLeSol()
-    if love.keyboard.isDown("space") and joueurSurLeSol then
+    if lireSautJoueur(1) and joueurSurLeSol then
         -- TODO comment sauter plus haut en fonction de la durée pendant laquelle on appuie?
         JOUEUR.vy = -JOUEUR_VITESSE_SAUT
     end
@@ -117,6 +122,42 @@ function bougerJoueur(dt)
     while JOUEUR.y > #NIVEAU.blocs do
         JOUEUR.y = JOUEUR.y - #NIVEAU.blocs
     end
+end
+
+function lireVitesseJoueur(index)
+    -- index est le numéro du joueur
+    local directionX = 0
+    if index == 1 then
+        if love.keyboard.isDown("right") then
+            directionX = directionX + 1
+        end
+        if love.keyboard.isDown("left") then
+            directionX = directionX - 1
+        end
+    end
+    if JOYSTICKS[index] then
+        local joystickX = JOYSTICKS[index]:getGamepadAxis("leftx")
+        if math.abs(joystickX) < 0.2 then
+            joystickX = 0
+        end
+        directionX = directionX + joystickX
+    end
+    directionX = math.max(-1, math.min(directionX, 1))
+    return directionX * JOUEUR_VITESSE
+end
+
+function lireSautJoueur(index)
+    if index == 1 then
+        if love.keyboard.isDown("space") then
+            return true
+        end
+    end
+    if JOYSTICKS[index] then
+        if JOYSTICKS[index]:isGamepadDown("a") or JOYSTICKS[index]:isGamepadDown("b") then
+            return true
+        end
+    end
+    return false
 end
 
 function testCollision(x1, y1, sx1, sy1, x2, y2, sx2, sy2)
