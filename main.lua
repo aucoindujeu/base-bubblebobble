@@ -4,7 +4,6 @@ IMAGES = {
     joueur = love.graphics.newImage("images/joueur.png"),
     bloc = love.graphics.newImage("images/bloc.png")
 }
-JOYSTICKS = { nil, nil }
 
 -- hauteur/largeur relativement à un bloc
 JOUEUR_TAILLE_X = 1.5
@@ -14,11 +13,14 @@ JOUEUR_VITESSE = 8
 JOUEUR_VITESSE_SAUT = 20
 JOUEUR_VITESSE_CHUTE_MAX = 10
 
-JOUEUR = {
-    x = 0,
-    y = 0,
-    vx = 0,
-    vy = 0
+JOUEURS = {
+    {
+        x = 0,
+        y = 0,
+        vx = 0,
+        vy = 0,
+        joystick = nil
+    }
 }
 NIVEAU = {}
 
@@ -36,107 +38,104 @@ function love.load()
 
     -- niveau
     NIVEAU = chargerNiveau("niveaux/niveau_1.txt")
-    JOUEUR.x = NIVEAU.positionDepartJoueur.x
-    JOUEUR.y = NIVEAU.positionDepartJoueur.y
+    -- TODO position des autres joueurs?
+    JOUEURS[1].x = NIVEAU.positionDepartJoueur.x
+    JOUEURS[1].y = NIVEAU.positionDepartJoueur.y
 end
 
 function love.joystickadded(joystick)
-    if not JOYSTICKS[1] then
-        JOYSTICKS[1] = joystick
-        print("Connected joystick 1")
-    elseif not JOYSTICKS[2] then
-        JOYSTICKS[2] = joystick
-        print("Connected joystick 2")
-    end
+    -- TODO ajouter un menu pour assigner facilement un joystick à chaque joueur
+    JOUEURS[1].joystick = joystick
 end
 
 function love.update(dt)
-    bougerJoueur(dt)
+    for j = 1, #JOUEURS do
+        bougerJoueur(JOUEURS[j], dt)
+    end
 end
 
-function bougerJoueur(dt)
+function bougerJoueur(joueur, dt)
     -- TODO contrôle à la manette
     -- bouger à gauche et à droite
-    JOUEUR.vx = lireVitesseJoueur(1)
+    joueur.vx = lireVitesseJoueur(joueur)
 
     -- Gravité
-    JOUEUR.vy = JOUEUR.vy + GRAVITE * dt
+    joueur.vy = joueur.vy + GRAVITE * dt
 
     -- saut
-    local joueurSurLeSol = testJoueurSurLeSol()
-    if lireSautJoueur(1) and joueurSurLeSol then
+    local joueurSurLeSol = testJoueurSurLeSol(joueur)
+    if lireSautJoueur(joueur) and joueurSurLeSol then
         -- TODO comment sauter plus haut en fonction de la durée pendant laquelle on appuie?
-        JOUEUR.vy = -JOUEUR_VITESSE_SAUT
+        joueur.vy = -JOUEUR_VITESSE_SAUT
     end
 
     -- Vitesse de chute à ne pas dépasser
-    if JOUEUR.vy > JOUEUR_VITESSE_CHUTE_MAX then
-        JOUEUR.vy = JOUEUR_VITESSE_CHUTE_MAX
+    if joueur.vy > JOUEUR_VITESSE_CHUTE_MAX then
+        joueur.vy = JOUEUR_VITESSE_CHUTE_MAX
     end
 
     -- collisions
+    -- TODO collisions entre joueurs?
     for y, ligne in ipairs(NIVEAU.blocs) do
         for x, bloc in ipairs(ligne) do
             if bloc == 1 then
                 -- est-ce qu'il y a collision?
-                if JOUEUR.vy > 0 and testCollision( -- dessous
-                        JOUEUR.x, JOUEUR.y + JOUEUR_TAILLE_Y / 2 + JOUEUR.vy * dt / 2,
-                        JOUEUR_TAILLE_X, JOUEUR.vy * dt,
+                if joueur.vy > 0 and testCollision( -- dessous
+                        joueur.x, joueur.y + JOUEUR_TAILLE_Y / 2 + joueur.vy * dt / 2,
+                        JOUEUR_TAILLE_X, joueur.vy * dt,
                         x, y, 1, 1
                     ) then
-                    JOUEUR.vy = (y - 1 / 2 - JOUEUR_TAILLE_Y / 2 - JOUEUR.y) / dt
+                    joueur.vy = (y - 1 / 2 - JOUEUR_TAILLE_Y / 2 - joueur.y) / dt
                 end
-                if JOUEUR.vy < 0 and testCollision( -- dessus
-                        JOUEUR.x, JOUEUR.y - JOUEUR_TAILLE_Y / 2 + JOUEUR.vy * dt / 2,
-                        JOUEUR_TAILLE_X, -JOUEUR.vy * dt,
+                if joueur.vy < 0 and testCollision( -- dessus
+                        joueur.x, joueur.y - JOUEUR_TAILLE_Y / 2 + joueur.vy * dt / 2,
+                        JOUEUR_TAILLE_X, -joueur.vy * dt,
                         x, y, 1, 1
                     ) then
-                    JOUEUR.vy = (y + 1 / 2 + JOUEUR_TAILLE_Y / 2 - JOUEUR.y) / dt
+                    joueur.vy = (y + 1 / 2 + JOUEUR_TAILLE_Y / 2 - joueur.y) / dt
                 end
-                if JOUEUR.vx > 0 and testCollision( -- droite
-                        JOUEUR.x + JOUEUR_TAILLE_X / 2 + JOUEUR.vx * dt / 2, JOUEUR.y,
-                        JOUEUR.vx * dt, JOUEUR_TAILLE_Y,
+                if joueur.vx > 0 and testCollision( -- droite
+                        joueur.x + JOUEUR_TAILLE_X / 2 + joueur.vx * dt / 2, joueur.y,
+                        joueur.vx * dt, JOUEUR_TAILLE_Y,
                         x, y, 1, 1
                     ) then
-                    JOUEUR.vx = (x - 1 / 2 - JOUEUR_TAILLE_X / 2 - JOUEUR.x) / dt
+                    joueur.vx = (x - 1 / 2 - JOUEUR_TAILLE_X / 2 - joueur.x) / dt
                 end
-                if JOUEUR.vx < 0 and testCollision( -- gauche
-                        JOUEUR.x - JOUEUR_TAILLE_X / 2 + JOUEUR.vx * dt / 2, JOUEUR.y,
-                        -JOUEUR.vx * dt, JOUEUR_TAILLE_Y,
+                if joueur.vx < 0 and testCollision( -- gauche
+                        joueur.x - JOUEUR_TAILLE_X / 2 + joueur.vx * dt / 2, joueur.y,
+                        -joueur.vx * dt, JOUEUR_TAILLE_Y,
                         x, y, 1, 1
                     ) then
-                    JOUEUR.vx = (x + 1 / 2 + JOUEUR_TAILLE_X / 2 - JOUEUR.x) / dt
+                    joueur.vx = (x + 1 / 2 + JOUEUR_TAILLE_X / 2 - joueur.x) / dt
                 end
             end
         end
     end
 
     -- déplacement
-    JOUEUR.x = JOUEUR.x + JOUEUR.vx * dt
-    JOUEUR.y = JOUEUR.y + JOUEUR.vy * dt
+    joueur.x = joueur.x + joueur.vx * dt
+    joueur.y = joueur.y + joueur.vy * dt
 
     -- on garde le joueur dans les bornes du terrain
-    JOUEUR.x = math.min(NIVEAU.tailleX, math.max(1, JOUEUR.x))
+    joueur.x = math.min(NIVEAU.tailleX, math.max(1, joueur.x))
 
     -- quand le joueur tombe, on le fait remonter
-    while JOUEUR.y > #NIVEAU.blocs do
-        JOUEUR.y = JOUEUR.y - #NIVEAU.blocs
+    while joueur.y > #NIVEAU.blocs do
+        joueur.y = joueur.y - #NIVEAU.blocs
     end
 end
 
-function lireVitesseJoueur(index)
+function lireVitesseJoueur(joueur)
     -- index est le numéro du joueur
     local directionX = 0
-    if index == 1 then
-        if love.keyboard.isDown("right") then
-            directionX = directionX + 1
-        end
-        if love.keyboard.isDown("left") then
-            directionX = directionX - 1
-        end
+    if love.keyboard.isDown("right") then
+        directionX = directionX + 1
     end
-    if JOYSTICKS[index] then
-        local joystickX = JOYSTICKS[index]:getGamepadAxis("leftx")
+    if love.keyboard.isDown("left") then
+        directionX = directionX - 1
+    end
+    if joueur.joystick then
+        local joystickX = joueur.joystick:getGamepadAxis("leftx")
         if math.abs(joystickX) < 0.2 then
             joystickX = 0
         end
@@ -146,14 +145,12 @@ function lireVitesseJoueur(index)
     return directionX * JOUEUR_VITESSE
 end
 
-function lireSautJoueur(index)
-    if index == 1 then
-        if love.keyboard.isDown("space") then
-            return true
-        end
+function lireSautJoueur(joueur)
+    if love.keyboard.isDown("space") then
+        return true
     end
-    if JOYSTICKS[index] then
-        if JOYSTICKS[index]:isGamepadDown("a") or JOYSTICKS[index]:isGamepadDown("b") then
+    if joueur.joystick then
+        if joueur.joystick:isGamepadDown("a") or joueur.joystick:isGamepadDown("b") then
             return true
         end
     end
@@ -171,16 +168,16 @@ function testCollision(x1, y1, sx1, sy1, x2, y2, sx2, sy2)
     return true
 end
 
-function testJoueurSurLeSol()
+function testJoueurSurLeSol(joueur)
     -- est-ce que le joueur est sur le sol?
-    local solY = math.floor(JOUEUR.y + JOUEUR_TAILLE_Y / 2 + 1 / 2)
+    local solY = math.floor(joueur.y + JOUEUR_TAILLE_Y / 2 + 1 / 2)
     if solY < 1 or solY > #NIVEAU.blocs then
         return false
     end
-    local minX = math.max(1, math.ceil(JOUEUR.x - JOUEUR_TAILLE_X / 2 - 1 / 2))
-    local maxX = math.min(#NIVEAU.blocs[solY], math.floor(JOUEUR.x + JOUEUR_TAILLE_X / 2 + 1 / 2))
+    local minX = math.max(1, math.ceil(joueur.x - JOUEUR_TAILLE_X / 2 - 1 / 2))
+    local maxX = math.min(#NIVEAU.blocs[solY], math.floor(joueur.x + JOUEUR_TAILLE_X / 2 + 1 / 2))
     for solX = minX, maxX do
-        if math.abs(solX - JOUEUR.x) < JOUEUR_TAILLE_X / 2 + 1 / 2 then
+        if math.abs(solX - joueur.x) < JOUEUR_TAILLE_X / 2 + 1 / 2 then
             if NIVEAU.blocs[solY][solX] == 1 then
                 return true
             end
@@ -190,15 +187,17 @@ function testJoueurSurLeSol()
 end
 
 function love.draw()
-    dessinerJoueur()
+    for j = 1, #JOUEURS do
+        dessinerJoueur(JOUEURS[j])
+    end
     dessinerNiveau()
 end
 
-function dessinerJoueur()
+function dessinerJoueur(joueur)
     love.graphics.draw(
         IMAGES.joueur,
-        (JOUEUR.x - JOUEUR_TAILLE_X / 2) * ECHELLE_DESSIN,
-        (JOUEUR.y - JOUEUR_TAILLE_Y / 2) * ECHELLE_DESSIN,
+        (joueur.x - JOUEUR_TAILLE_X / 2) * ECHELLE_DESSIN,
+        (joueur.y - JOUEUR_TAILLE_Y / 2) * ECHELLE_DESSIN,
         0,                                                             -- orientation
         (JOUEUR_TAILLE_X / IMAGES.joueur:getWidth()) * ECHELLE_DESSIN, -- scaleX
         (JOUEUR_TAILLE_Y / IMAGES.joueur:getHeight()) * ECHELLE_DESSIN -- scaleY
