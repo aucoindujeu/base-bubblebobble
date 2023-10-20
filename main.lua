@@ -190,10 +190,9 @@ function testCollision(x1, y1, sx1, sy1, x2, y2, sx2, sy2)
 end
 
 function testObjetSurLeSol(objet)
-    -- TODO on a un problème lorsqu'on saute sur le côté d'un mur
     -- est-ce que l'objet est sur le sol?
-    local solY = math.floor(objet.y + objet.tailleY / 2 + 1 / 2)
-    if solY < 1 or solY > #NIVEAU.blocs then
+    local solY = objet.y + objet.tailleY / 2 + 1 / 2
+    if solY < 1 or solY > #NIVEAU.blocs or solY ~= math.floor(solY) then
         return false
     end
     local minX = math.max(1, math.ceil(objet.x - objet.tailleX / 2 - 1 / 2))
