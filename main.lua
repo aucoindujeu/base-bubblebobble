@@ -61,8 +61,8 @@ end
 
 function calculerVitesseMonstre(monstre, dt)
     if monstre.vx == 0 and testObjetSurLeSol(monstre) then
-        -- quand le monstre est sur le sol avec une vitesse nulle, on le fait se
-        -- déplacer dans une direction au hasard
+        -- quand le monstre est sur le sol avec une vitesse horizontale nulle, on le
+        -- fait se déplacer dans une direction au hasard
         monstre.vx = (math.random(0, 1) * 2 - 1) * MONSTRES_VITESSE
     end
     local vx = monstre.vx
@@ -76,8 +76,24 @@ function calculerVitesseMonstre(monstre, dt)
 end
 
 function calculerVitesseJoueur(joueur, dt)
-    -- bouger à gauche et à droite
-    joueur.vx = lireVitesseJoueur(joueur)
+    -- Déplacement à gauche et à droite
+    local vx = 0
+    if love.keyboard.isDown("right") then
+        vx = vx + 1
+    end
+    if love.keyboard.isDown("left") then
+        vx = vx - 1
+    end
+    if joueur.joystick then
+        local joystickX = joueur.joystick:getGamepadAxis("leftx")
+        if math.abs(joystickX) < 0.2 then
+            -- on limite les petits déplacements
+            joystickX = 0
+        end
+        vx = vx + joystickX
+    end
+    vx = math.max(-1, math.min(vx, 1))
+    joueur.vx = vx * JOUEUR_VITESSE
 
     -- saut
     if lireSautJoueur(joueur) and testObjetSurLeSol(joueur) then
@@ -87,25 +103,6 @@ function calculerVitesseJoueur(joueur, dt)
     end
 
     calculerVitesse(joueur, dt)
-end
-
-function lireVitesseJoueur(joueur)
-    local directionX = 0
-    if love.keyboard.isDown("right") then
-        directionX = directionX + 1
-    end
-    if love.keyboard.isDown("left") then
-        directionX = directionX - 1
-    end
-    if joueur.joystick then
-        local joystickX = joueur.joystick:getGamepadAxis("leftx")
-        if math.abs(joystickX) < 0.2 then
-            joystickX = 0
-        end
-        directionX = directionX + joystickX
-    end
-    directionX = math.max(-1, math.min(directionX, 1))
-    return directionX * JOUEUR_VITESSE
 end
 
 function lireSautJoueur(joueur)
@@ -193,6 +190,7 @@ function testCollision(x1, y1, sx1, sy1, x2, y2, sx2, sy2)
 end
 
 function testObjetSurLeSol(objet)
+    -- TODO on a un problème lorsqu'on saute sur le côté d'un mur
     -- est-ce que l'objet est sur le sol?
     local solY = math.floor(objet.y + objet.tailleY / 2 + 1 / 2)
     if solY < 1 or solY > #NIVEAU.blocs then
