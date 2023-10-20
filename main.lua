@@ -1,62 +1,189 @@
+local Timer = require "lib.knife.timer"
+local push = require "lib.push"
+
+-- Variables qu'on peut modifier pour changer le gameplay ou l'apparennce du jeu
+NOM = "xxxxxxxxx"
 GRAVITE = 9.81 * 7
 VENT = 0
+JOUEUR_VITESSE = 8
+JOUEUR_VITESSE_SAUT = 20
+JOUEUR_TAILLE = 1
+MONSTRES_VITESSE = JOUEUR_VITESSE * 0.5
+MONSTRES_TAILLE = 0.8
+VITESSE_CHUTE_MAX = 10
+ECHELLE_DESSIN = 50
+LARGEUR_JEU = 800
+HAUTEUR_JEU = 600
+TYPO = love.graphics.newFont("typos/retro.ttf", 64)
+
+-- Ne pas modifier ces variables
+NIVEAU_ACTUEL = 0
+NIVEAU = {}
+JOUEURS = {}
+MONSTRES = {}
+ControleurFleches = {}
+ControleurAD = {}
+ControleurJoystick = {}
+CONTROLEURS = {
+    ControleurFleches,
+    ControleurAD
+}
+TOUCHES_PRESSEES = {}
+
+-- Ne pas modifier ces variables, mais directement les fichiers
 IMAGES = {
     joueur = love.graphics.newImage("images/joueur.png"),
     bloc = love.graphics.newImage("images/bloc.png"),
     monstre = love.graphics.newImage("images/monstre.png")
 }
 SONS = {
-    saut = love.audio.newSource("sons/saut.mp3", "static")
+    defaite = love.audio.newSource("sons/defaite.mp3", "static"),
+    saut = love.audio.newSource("sons/saut.mp3", "static"),
+    victoire = love.audio.newSource("sons/victoire.mp3", "static")
 }
 
-JOUEUR_VITESSE = 8
-JOUEUR_VITESSE_SAUT = 20
-JOUEUR_TAILLE = 1
-
-MONSTRES_VITESSE = JOUEUR_VITESSE * 0.5
-MONSTRES_TAILLE = 0.8
-
-VITESSE_CHUTE_MAX = 10
-
-NIVEAU = {}
-JOUEURS = {}
-MONSTRES = {}
-
--- On considère que les blocs sont de taille 1x1. Quand on les dessine, ils ont cette
--- taille.
-ECHELLE_DESSIN = 50
+EtatActuel = nil
+EtatNiveauSuivant = {}
+EtatCombat = {}
+EtatDefaite = {}
+EtatVictoire = {}
 
 function love.load()
-    -- fenêtre
-    local longueurFenetre, hauteurFenetre = love.window.getDesktopDimensions()
-    love.window.setMode(
-        longueurFenetre, hauteurFenetre,
-        { resizable = true }
+    love.window.setTitle(NOM)
+    love.graphics.setFont(TYPO)
+    love.graphics.setDefaultFilter("nearest", "nearest")
+    local largeurFenetre, hauteurFenetre = love.window.getDesktopDimensions()
+    push:setupScreen(
+        LARGEUR_JEU, HAUTEUR_JEU,
+        largeurFenetre, hauteurFenetre,
+        { fullscreen = false, resizable = true }
     )
 
-    -- niveau
-    chargerNiveau("niveaux/niveau_1.txt")
+    changerEtat(EtatNiveauSuivant)
 end
 
 function love.joystickadded(joystick)
     -- TODO ajouter un menu pour assigner facilement un joystick à chaque joueur
-    JOUEURS[1].joystick = joystick
+    -- TODO assigner joystick aux joueurs
+    -- JOUEURS[1].joystick = joystick
 end
 
 function love.update(dt)
-    -- Déplacement des joueurs
-    for j = 1, #JOUEURS do
-        if JOUEURS[j].vivant then
-            calculerVitesseJoueur(JOUEURS[j], dt)
-            deplacerObjet(JOUEURS[j], dt)
+    Timer.update(dt)
+    if EtatActuel.update then
+        EtatActuel:update(dt)
+    end
+    TOUCHES_PRESSEES = {}
+end
+
+function love.draw()
+    push:start()
+    if EtatActuel.dessiner then
+        EtatActuel:dessiner()
+    end
+    push:finish()
+end
+
+function love.resize(largeur, hauteur)
+    push:resize(largeur, hauteur)
+end
+
+function love.keypressed(touche)
+    -- TODO gérer les pauses
+    TOUCHES_PRESSEES[touche] = true
+    if touche == "escape" then
+        -- TODO vraiment?
+        love.event.quit()
+    end
+end
+
+function changerEtat(nouvelEtat)
+    if EtatActuel and EtatActuel.sortir then
+        EtatActuel:sortir()
+    end
+    EtatActuel = nouvelEtat
+    if EtatActuel.entrer then
+        EtatActuel:entrer()
+    end
+end
+
+function EtatNiveauSuivant:entrer()
+    NIVEAU_ACTUEL = NIVEAU_ACTUEL + 1
+
+    local fichierNiveau = string.format("niveaux/niveau-%03d.txt", NIVEAU_ACTUEL)
+    local niveauInfo = love.filesystem.getInfo(fichierNiveau)
+    if not niveauInfo then
+        -- On a fait le dernier niveau !
+        changerEtat(EtatVictoire)
+    else
+        -- On part au combat...
+        chargerNiveau(fichierNiveau)
+        Timer.after(2, function() changerEtat(EtatCombat) end)
+    end
+end
+
+function EtatNiveauSuivant:dessiner()
+    ecrire(
+        string.format("Level %d", NIVEAU_ACTUEL),
+        LARGEUR_JEU / 2,
+        HAUTEUR_JEU * 0.4,
+        3
+    )
+end
+
+function chargerNiveau(path)
+    NIVEAU.blocs = {}
+    NIVEAU.tailleX = 0
+    local y = 1
+    for line in love.filesystem.lines(path) do
+        NIVEAU.blocs[y] = {}
+        for x = 1, #line do
+            local caractere = line:sub(x, x)
+            if caractere == "x" then
+                NIVEAU.blocs[y][x] = 1
+            elseif caractere == "j" then
+                -- TODO position des autres joueurs?
+                JOUEURS[#JOUEURS + 1] = {
+                    x = x,
+                    y = y,
+                    vx = 0,
+                    vy = 0,
+                    vivant = true,
+                    tailleX = JOUEUR_TAILLE,
+                    tailleY = JOUEUR_TAILLE,
+                    image = IMAGES.joueur,
+                    controleur = CONTROLEURS[#JOUEURS + 1]
+                }
+            elseif caractere == "m" then
+                MONSTRES[#MONSTRES + 1] = {
+                    x = x,
+                    y = y,
+                    vx = 0,
+                    vy = 0,
+                    vivant = true,
+                    tailleX = MONSTRES_TAILLE,
+                    tailleY = MONSTRES_TAILLE,
+                    image = IMAGES.monstre
+                }
+            else
+                NIVEAU.blocs[y][x] = 0
+            end
+            NIVEAU.tailleX = math.max(NIVEAU.tailleX, x)
+        end
+        y = y + 1
+    end
+end
+
+function EtatCombat:update(dt)
+    -- Calcul des vitesses
+    for _, joueur in ipairs(JOUEURS) do
+        if joueur.vivant then
+            calculerVitesseJoueur(joueur, dt)
         end
     end
-
-    -- Déplacement des monstres
-    for m = 1, #MONSTRES do
-        if MONSTRES[m].vivant then
-            calculerVitesseMonstre(MONSTRES[m], dt)
-            deplacerObjet(MONSTRES[m], dt)
+    for _, monstre in ipairs(MONSTRES) do
+        if monstre.vivant then
+            calculerVitesseMonstre(monstre, dt)
         end
     end
 
@@ -71,6 +198,32 @@ function love.update(dt)
                 monstre.vivant = false
             end
         end
+    end
+
+    -- Déplacements
+    local joueursVivants = 0
+    for _, joueur in ipairs(JOUEURS) do
+        if joueur.vivant then
+            joueursVivants = joueursVivants + 1
+            deplacerObjet(joueur, dt)
+        end
+    end
+    local monstresVivants = 0
+    for _, monstre in ipairs(MONSTRES) do
+        if monstre.vivant then
+            monstresVivants = monstresVivants + 1
+            deplacerObjet(monstre, dt)
+        end
+    end
+
+    if joueursVivants == 0 then
+        -- TODO game over
+        SONS.defaite:play()
+        Timer.after(2, function() changerEtat(EtatDefaite) end)
+    elseif monstresVivants == 0 then
+        -- victoire ! niveau suivant
+        SONS.victoire:play()
+        Timer.after(2, function() changerEtat(EtatNiveauSuivant) end)
     end
 end
 
@@ -92,44 +245,16 @@ end
 
 function calculerVitesseJoueur(joueur, dt)
     -- Déplacement à gauche et à droite
-    local vx = 0
-    if love.keyboard.isDown("right") then
-        vx = vx + 1
-    end
-    if love.keyboard.isDown("left") then
-        vx = vx - 1
-    end
-    if joueur.joystick then
-        local joystickX = joueur.joystick:getGamepadAxis("leftx")
-        if math.abs(joystickX) < 0.2 then
-            -- on limite les petits déplacements
-            joystickX = 0
-        end
-        vx = vx + joystickX
-    end
-    vx = math.max(-1, math.min(vx, 1))
-    joueur.vx = vx * JOUEUR_VITESSE
+    joueur.vx = joueur.controleur:directionX() * JOUEUR_VITESSE
 
     -- saut
-    if lireSautJoueur(joueur) and testObjetSurLeSol(joueur) then
+    if joueur.controleur:saut() and testObjetSurLeSol(joueur) then
         -- TODO comment sauter plus haut en fonction de la durée pendant laquelle on appuie?
         joueur.vy = -JOUEUR_VITESSE_SAUT
         SONS.saut:play()
     end
 
     calculerVitesse(joueur, dt)
-end
-
-function lireSautJoueur(joueur)
-    if love.keyboard.isDown("space") then
-        return true
-    end
-    if joueur.joystick then
-        if joueur.joystick:isGamepadDown("a") or joueur.joystick:isGamepadDown("b") then
-            return true
-        end
-    end
-    return false
 end
 
 function calculerVitesse(objet, dt)
@@ -222,7 +347,7 @@ function testObjetSurLeSol(objet)
     return false
 end
 
-function love.draw()
+function EtatCombat:dessiner()
     dessinerNiveau()
     for _, monstre in ipairs(MONSTRES) do
         if monstre.vivant then
@@ -238,78 +363,28 @@ function dessinerNiveau()
     for y = 1, #NIVEAU.blocs do
         for x = 1, #NIVEAU.blocs[y] do
             if NIVEAU.blocs[y][x] == 1 then
-                love.graphics.draw(
-                    IMAGES.bloc,
-                    (x - 1 / 2) * ECHELLE_DESSIN,
-                    (y - 1 / 2) * ECHELLE_DESSIN,
-                    0,
-                    (1 / IMAGES.bloc:getWidth()) * ECHELLE_DESSIN,
-                    (1 / IMAGES.bloc:getHeight()) * ECHELLE_DESSIN
-
-                )
+                dessinerImage(x, y, 1, 1, IMAGES.bloc)
             end
         end
     end
 end
 
 function dessinerObjet(objet)
+    dessinerImage(objet.x, objet.y, objet.tailleX, objet.tailleY, objet.image)
+end
+
+function dessinerImage(x, y, tailleX, tailleY, image)
+    local echelle = math.min(LARGEUR_JEU / NIVEAU.tailleX, HAUTEUR_JEU / #NIVEAU.blocs)
+    local offsetX = (LARGEUR_JEU - NIVEAU.tailleX * echelle) / 2
+    local offsetY = (HAUTEUR_JEU - #NIVEAU.blocs * echelle) / 2
     love.graphics.draw(
-        objet.image,
-        (objet.x - objet.tailleX / 2) * ECHELLE_DESSIN,
-        (objet.y - objet.tailleY / 2) * ECHELLE_DESSIN,
-        0,                                                         -- orientation
-        (objet.tailleX / objet.image:getWidth()) * ECHELLE_DESSIN, -- scaleX
-        (objet.tailleY / objet.image:getHeight()) * ECHELLE_DESSIN -- scaleY
+        image,
+        (x - 1 - tailleX / 2) * echelle + offsetX,
+        (y - 1 - tailleY / 2) * echelle  + offsetY,
+        0,                                      -- orientation
+        (tailleX / image:getWidth()) * echelle, -- scaleX
+        (tailleY / image:getHeight()) * echelle -- scaleY
     )
-end
-
-function love.keypressed(touche)
-    if touche == "escape" then
-        love.event.quit()
-    end
-end
-
-function chargerNiveau(path)
-    NIVEAU.blocs = {}
-    NIVEAU.tailleX = 0
-    local y = 1
-    for line in love.filesystem.lines(path) do
-        NIVEAU.blocs[y] = {}
-        for x = 1, #line do
-            local caractere = line:sub(x, x)
-            if caractere == "x" then
-                NIVEAU.blocs[y][x] = 1
-            elseif caractere == "j" then
-                -- TODO position des autres joueurs?
-                JOUEURS[#JOUEURS + 1] = {
-                    x = x,
-                    y = y,
-                    vx = 0,
-                    vy = 0,
-                    vivant = true,
-                    tailleX = JOUEUR_TAILLE,
-                    tailleY = JOUEUR_TAILLE,
-                    image = IMAGES.joueur,
-                    joystick = nil
-                }
-            elseif caractere == "m" then
-                MONSTRES[#MONSTRES + 1] = {
-                    x = x,
-                    y = y,
-                    vx = 0,
-                    vy = 0,
-                    vivant = true,
-                    tailleX = MONSTRES_TAILLE,
-                    tailleY = MONSTRES_TAILLE,
-                    image = IMAGES.monstre
-                }
-            else
-                NIVEAU.blocs[y][x] = 0
-            end
-            NIVEAU.tailleX = math.max(NIVEAU.tailleX, x)
-        end
-        y = y + 1
-    end
 end
 
 function signe(nombre)
@@ -320,4 +395,63 @@ function signe(nombre)
     else
         return 0
     end
+end
+
+function EtatVictoire:dessiner()
+    ecrire("gg!", LARGEUR_JEU / 2, HAUTEUR_JEU / 2, 5)
+end
+
+function ecrire(texte, x, y, echelle)
+    local largeur = TYPO:getWidth(texte) * echelle
+    local hauteur = TYPO:getHeight() * echelle
+    love.graphics.print(
+        texte,
+        x - largeur / 2,
+        y - hauteur / 2,
+        0,
+        echelle, echelle
+    )
+end
+
+function ControleurFleches:directionX()
+    local dirX = 0
+    if love.keyboard.isDown("left") then
+        dirX = dirX - 1
+    end
+    if love.keyboard.isDown("right") then
+        dirX = dirX + 1
+    end
+    return dirX
+end
+
+function ControleurFleches:saut()
+    return TOUCHES_PRESSEES["rctrl"] or TOUCHES_PRESSEES["space"]
+end
+
+function ControleurAD:directionX()
+    local dirX = 0
+    if love.keyboard.isDown("q") or love.keyboard.isDown("a") then
+        dirX = dirX - 1
+    end
+    if love.keyboard.isDown("d") then
+        dirX = dirX + 1
+    end
+    return dirX
+end
+
+function ControleurAD:saut()
+    return TOUCHES_PRESSEES["lshift"]
+end
+
+function ControleurJoystick.directionX(controleur)
+    local dirX = controleur.joystick:getGamepadAxis("leftx")
+    if math.abs(dirX) < 0.2 then
+        -- on limite les petits déplacements
+        dirX = 0
+    end
+    return dirX
+end
+
+function ControleurJoystick.saut(controleur)
+    return controleur.joystick:isGamepadDown("a") or controleur.joystick:isGamepadDown("b")
 end
