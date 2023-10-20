@@ -230,7 +230,12 @@ function EtatCombat:update(dt)
                             monstre.x, monstre.y,
                             monstre.tailleX, monstre.tailleY
                         ) and joueur.y + joueur.tailleY / 2 < monstre.y - monstre.tailleY / 2 then
-                        -- TODO faire une petite animation avec le monstre
+                        -- Monstre écrasé !
+                        Timer.after(1 / 12, function()
+                            monstre.tailleY = monstre.tailleY / 2
+                            monstre.y = monstre.y + monstre.tailleY * 3 / 4
+                        end)
+                        Timer.after(2 / 12, function() monstre.tailleY = 0 end)
                         monstre.vivant = false
                     elseif testCollision(
                             joueur.x, joueur.y,
@@ -238,8 +243,12 @@ function EtatCombat:update(dt)
                             monstre.x, monstre.y,
                             monstre.tailleX, monstre.tailleY
                         ) then
-                        -- TODO faire une petite animation
+                        -- Joueur mort !
                         joueur.vivant = false
+                        Timer.tween(1, {
+                            -- on rend le joueur tout petit
+                            [joueur] = { tailleX = 0, tailleY = 0 }
+                        })
                         SONS.mort:play()
                     end
                 end
@@ -396,9 +405,7 @@ end
 function EtatCombat:dessiner()
     dessinerNiveau()
     for _, monstre in ipairs(MONSTRES) do
-        if monstre.vivant then
-            dessinerObjet(monstre)
-        end
+        dessinerObjet(monstre)
     end
     for _, joueur in ipairs(JOUEURS) do
         dessinerObjet(joueur)
