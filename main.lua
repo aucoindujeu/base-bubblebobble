@@ -39,10 +39,12 @@ IMAGES = {
 SONS = {
     defaite = love.audio.newSource("sons/defaite.mp3", "static"),
     saut = love.audio.newSource("sons/saut.mp3", "static"),
-    victoire = love.audio.newSource("sons/victoire.mp3", "static")
+    victoire = love.audio.newSource("sons/victoire.mp3", "static"),
+    musique_debut = love.audio.newSource("sons/musique-debut.mp3", "stream")
 }
 
 EtatActuel = nil
+EtatDebut = {}
 EtatNiveauSuivant = {}
 EtatCombat = {}
 EtatDefaite = {}
@@ -59,7 +61,7 @@ function love.load()
         { fullscreen = false, resizable = true }
     )
 
-    changerEtat(EtatNiveauSuivant)
+    changerEtat(EtatDebut)
 end
 
 function love.joystickadded(joystick)
@@ -104,6 +106,26 @@ function changerEtat(nouvelEtat)
     EtatActuel = nouvelEtat
     if EtatActuel.entrer then
         EtatActuel:entrer()
+    end
+end
+
+function EtatDebut:entrer()
+    SONS.musique_debut:play()
+    SONS.musique_debut:setLooping(true)
+end
+
+function EtatDebut:dessiner()
+    ecrire(NOM, LARGEUR_JEU/2, HAUTEUR_JEU*0.3, 5)
+    ecrire("appuie sur espace", LARGEUR_JEU/2, HAUTEUR_JEU*0.8, 0.5)
+end
+
+function EtatDebut:sortir()
+    SONS.musique_debut:stop()
+end
+
+function EtatDebut:update(dt)
+    if TOUCHES_PRESSEES["space"] then
+        changerEtat(EtatNiveauSuivant)
     end
 end
 
