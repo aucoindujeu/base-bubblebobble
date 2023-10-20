@@ -5,6 +5,6 @@ x                            x
 x                            x
 x      j                     x
 x                            x
-x                        xx  x
-x                      xx    x
+x                       xxx  x
+x                    x xx  x x
 xxxxxxxxxxxx      xxxxxxxxxxxx
