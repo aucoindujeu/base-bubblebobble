@@ -11,8 +11,10 @@ SONS = {
 
 JOUEUR_VITESSE = 8
 JOUEUR_VITESSE_SAUT = 20
+JOUEUR_TAILLE = 1
 
 MONSTRES_VITESSE = JOUEUR_VITESSE * 0.5
+MONSTRES_TAILLE = 0.8
 
 VITESSE_CHUTE_MAX = 10
 
@@ -57,6 +59,19 @@ function love.update(dt)
             deplacerObjet(MONSTRES[m], dt)
         end
     end
+
+    -- Collision entre les joueurs et les monstres
+    for _, joueur in ipairs(JOUEURS) do
+        for _, monstre in ipairs(MONSTRES) do
+            if testCollision(
+                    joueur.x, joueur.y, joueur.tailleX, joueur.tailleY,
+                    monstre.x, monstre.y, monstre.tailleX, monstre.tailleY
+                ) then
+                -- TODO le monstre n'est tué que si on saute sur sa tête avec les pieds
+                monstre.vivant = false
+            end
+        end
+    end
 end
 
 function calculerVitesseMonstre(monstre, dt)
@@ -65,13 +80,13 @@ function calculerVitesseMonstre(monstre, dt)
         -- fait se déplacer dans une direction au hasard
         monstre.vx = (math.random(0, 1) * 2 - 1) * MONSTRES_VITESSE
     end
-    local vx = monstre.vx
+    local directionInitiale = signe(monstre.vx)
 
     calculerVitesse(monstre, dt)
 
-    if vx ~= 0 and monstre.vx == 0 then
+    if directionInitiale ~= 0 and monstre.vx == 0 then
         -- le monstre a fait une collision, on change de direction
-        monstre.vx = -signe(vx) * MONSTRES_VITESSE
+        monstre.vx = -directionInitiale * MONSTRES_VITESSE
     end
 end
 
@@ -130,7 +145,7 @@ function calculerVitesse(objet, dt)
     for y, ligne in ipairs(NIVEAU.blocs) do
         for x, bloc in ipairs(ligne) do
             if bloc == 1 then
-                -- est-ce qu'il y a collision?
+                -- est-ce qu'il y a collision ?
                 if objet.vy > 0 and testCollision( -- dessous
                         objet.x, objet.y + objet.tailleY / 2 + objet.vy * dt / 2,
                         objet.tailleX, objet.vy * dt,
@@ -209,11 +224,13 @@ end
 
 function love.draw()
     dessinerNiveau()
-    for m = 1, #MONSTRES do
-        dessinerObjet(MONSTRES[m])
+    for _, monstre in ipairs(MONSTRES) do
+        if monstre.vivant then
+            dessinerObjet(monstre)
+        end
     end
-    for j = 1, #JOUEURS do
-        dessinerObjet(JOUEURS[j])
+    for _, joueur in ipairs(JOUEURS) do
+        dessinerObjet(joueur)
     end
 end
 
@@ -270,8 +287,8 @@ function chargerNiveau(path)
                     vx = 0,
                     vy = 0,
                     vivant = true,
-                    tailleX = 1.2,
-                    tailleY = 1.2,
+                    tailleX = JOUEUR_TAILLE,
+                    tailleY = JOUEUR_TAILLE,
                     image = IMAGES.joueur,
                     joystick = nil
                 }
@@ -282,8 +299,8 @@ function chargerNiveau(path)
                     vx = 0,
                     vy = 0,
                     vivant = true,
-                    tailleX = 0.8,
-                    tailleY = 0.8,
+                    tailleX = MONSTRES_TAILLE,
+                    tailleY = MONSTRES_TAILLE,
                     image = IMAGES.monstre
                 }
             else
