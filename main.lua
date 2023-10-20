@@ -161,6 +161,7 @@ end
 function chargerNiveau(path)
     JOUEURS = {}
     NIVEAU = {}
+    MONSTRES = {}
     NIVEAU.blocs = {}
     NIVEAU.tailleX = 0
     local y = 1
