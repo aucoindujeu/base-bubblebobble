@@ -117,7 +117,7 @@ end
 
 function EtatDebut:dessiner()
     love.graphics.setColor(1, 1, 0)
-    ecrire(NOM, LARGEUR_JEU / 2, HAUTEUR_JEU * 0.3, 5)
+    ecrire(NOM, LARGEUR_JEU / 2, HAUTEUR_JEU * 0.3, 2)
     love.graphics.setColor(1, 1, 1)
     ecrire("appuie sur espace", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.8, 0.5)
 end
@@ -154,7 +154,7 @@ function EtatNiveauSuivant:dessiner()
         string.format("Level %d", NIVEAU_ACTUEL),
         LARGEUR_JEU / 2,
         HAUTEUR_JEU * 0.4,
-        3
+        1
     )
 end
 
