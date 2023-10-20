@@ -5,6 +5,9 @@ IMAGES = {
     bloc = love.graphics.newImage("images/bloc.png"),
     monstre = love.graphics.newImage("images/monstre.png")
 }
+SONS = {
+    saut = love.audio.newSource("sons/saut.mp3", "static")
+}
 
 JOUEUR_VITESSE = 8
 JOUEUR_VITESSE_SAUT = 20
@@ -80,6 +83,7 @@ function calculerVitesseJoueur(joueur, dt)
     if lireSautJoueur(joueur) and testObjetSurLeSol(joueur) then
         -- TODO comment sauter plus haut en fonction de la durée pendant laquelle on appuie?
         joueur.vy = -JOUEUR_VITESSE_SAUT
+        SONS.saut:play()
     end
 
     calculerVitesse(joueur, dt)
