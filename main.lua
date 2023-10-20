@@ -38,6 +38,7 @@ IMAGES = {
 }
 SONS = {
     defaite = love.audio.newSource("sons/defaite.mp3", "static"),
+    mort = love.audio.newSource("sons/mort.mp3", "static"),
     saut = love.audio.newSource("sons/saut.mp3", "static"),
     victoire = love.audio.newSource("sons/victoire.mp3", "static"),
     musique_debut = love.audio.newSource("sons/musique-debut.mp3", "stream")
@@ -115,12 +116,15 @@ function EtatDebut:entrer()
 end
 
 function EtatDebut:dessiner()
-    ecrire(NOM, LARGEUR_JEU/2, HAUTEUR_JEU*0.3, 5)
-    ecrire("appuie sur espace", LARGEUR_JEU/2, HAUTEUR_JEU*0.8, 0.5)
+    love.graphics.setColor(1, 1, 0)
+    ecrire(NOM, LARGEUR_JEU / 2, HAUTEUR_JEU * 0.3, 5)
+    love.graphics.setColor(1, 1, 1)
+    ecrire("appuie sur espace", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.8, 0.5)
 end
 
 function EtatDebut:sortir()
     SONS.musique_debut:stop()
+    NIVEAU_ACTUEL = 0
 end
 
 function EtatDebut:update(dt)
@@ -145,6 +149,7 @@ function EtatNiveauSuivant:entrer()
 end
 
 function EtatNiveauSuivant:dessiner()
+    love.graphics.setColor(1, 1, 1)
     ecrire(
         string.format("Level %d", NIVEAU_ACTUEL),
         LARGEUR_JEU / 2,
@@ -154,6 +159,8 @@ function EtatNiveauSuivant:dessiner()
 end
 
 function chargerNiveau(path)
+    JOUEURS = {}
+    NIVEAU = {}
     NIVEAU.blocs = {}
     NIVEAU.tailleX = 0
     local y = 1
@@ -211,13 +218,30 @@ function EtatCombat:update(dt)
 
     -- Collision entre les joueurs et les monstres
     for _, joueur in ipairs(JOUEURS) do
-        for _, monstre in ipairs(MONSTRES) do
-            if testCollision(
-                    joueur.x, joueur.y, joueur.tailleX, joueur.tailleY,
-                    monstre.x, monstre.y, monstre.tailleX, monstre.tailleY
-                ) then
-                -- TODO le monstre n'est tué que si on saute sur sa tête avec les pieds
-                monstre.vivant = false
+        if joueur.vivant then
+            for _, monstre in ipairs(MONSTRES) do
+                if monstre.vivant then
+                    -- si le joueur va rentrer en collision avec le monstre et que les pieds
+                    -- du joueur étaient au dessus de la tête du monstre, alors on a tué le monstre
+                    if joueur.vy > 0 and testCollision(
+                            joueur.x + joueur.vx * dt, joueur.y + joueur.vy * dt,
+                            joueur.tailleX, joueur.tailleY,
+                            monstre.x, monstre.y,
+                            monstre.tailleX, monstre.tailleY
+                        ) and joueur.y + joueur.tailleY / 2 < monstre.y - monstre.tailleY / 2 then
+                        -- TODO faire une petite animation avec le monstre
+                        monstre.vivant = false
+                    elseif testCollision(
+                            joueur.x, joueur.y,
+                            joueur.tailleX, joueur.tailleY,
+                            monstre.x, monstre.y,
+                            monstre.tailleX, monstre.tailleY
+                        ) then
+                        -- TODO faire une petite animation
+                        joueur.vivant = false
+                        SONS.mort:play()
+                    end
+                end
             end
         end
     end
@@ -240,7 +264,6 @@ function EtatCombat:update(dt)
 
     if joueursVivants == 0 then
         -- TODO game over
-        SONS.defaite:play()
         Timer.after(2, function() changerEtat(EtatDefaite) end)
     elseif monstresVivants == 0 then
         -- victoire ! niveau suivant
@@ -402,7 +425,7 @@ function dessinerImage(x, y, tailleX, tailleY, image)
     love.graphics.draw(
         image,
         (x - 1 - tailleX / 2) * echelle + offsetX,
-        (y - 1 - tailleY / 2) * echelle  + offsetY,
+        (y - 1 - tailleY / 2) * echelle + offsetY,
         0,                                      -- orientation
         (tailleX / image:getWidth()) * echelle, -- scaleX
         (tailleY / image:getHeight()) * echelle -- scaleY
@@ -419,7 +442,24 @@ function signe(nombre)
     end
 end
 
+function EtatDefaite:entrer(dt)
+    SONS.defaite:play()
+end
+
+function EtatDefaite:update(dt)
+    if TOUCHES_PRESSEES["space"] then
+        changerEtat(EtatDebut)
+    end
+end
+
+function EtatDefaite:dessiner()
+    love.graphics.setColor(1, 1, 1)
+    ecrire("Game\nOver", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.3, 2)
+    ecrire("appuie sur espace", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.8, 0.5)
+end
+
 function EtatVictoire:dessiner()
+    love.graphics.setColor(1, 1, 1)
     ecrire("gg!", LARGEUR_JEU / 2, HAUTEUR_JEU / 2, 5)
 end
 
