@@ -1,7 +1,7 @@
 local Timer = require "lib.knife.timer"
 local push = require "lib.push"
 
--- Variables qu'on peut modifier pour changer le gameplay ou l'apparennce du jeu
+-- Variables qu'on peut modifier pour changer le gameplay ou l'apparence du jeu
 NOM = "xxxxxxxxx"
 GRAVITE = 9.81 * 7
 VENT = 0
