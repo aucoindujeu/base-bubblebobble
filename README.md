@@ -4,4 +4,8 @@
 
 Comment lancer le jeu:
 
-    love .
+    make play
+
+En faire une version exécutable sur le web:
+
+    make js

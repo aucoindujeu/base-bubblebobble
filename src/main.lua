@@ -562,6 +562,22 @@ function EtatVictoire:dessiner()
     ecrire("gg!", LARGEUR_JEU / 2, HAUTEUR_JEU / 2, 5)
 end
 
+function EtatVictoire:update(dt)
+    -- TODO code dupliqué de EtatDefaite et EtatDebut
+    local appuieStart = TOUCHES_PRESSEES["space"]
+    if TOUCHES_PRESSEES["return"] then
+        appuieStart = true
+    end
+    for _, joystick in ipairs(love.joystick:getJoysticks()) do
+        if joystick:isGamepadDown("start") then
+            appuieStart = true
+        end
+    end
+    if appuieStart then
+        changerEtat(EtatDebut)
+    end
+end
+
 function ecrire(texte, x, y, echelle)
     local largeur = TYPO:getWidth(texte) * echelle
     local hauteur = TYPO:getHeight() * echelle
