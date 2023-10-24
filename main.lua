@@ -403,7 +403,7 @@ function calculerVitesse(objet, dt)
         objet.vy = VITESSE_CHUTE_MAX
     end
 
-    -- collisions
+    -- collisions avec les blocs
     for y, ligne in ipairs(NIVEAU.blocs) do
         for x, bloc in ipairs(ligne) do
             if bloc == 1 then
