@@ -69,12 +69,6 @@ function love.load()
     changerEtat(EtatDebut)
 end
 
-function love.joystickadded(joystick)
-    -- TODO ajouter un menu pour assigner facilement un joystick à chaque joueur
-    -- TODO assigner joystick aux joueurs
-    -- JOUEURS[1].joystick = joystick
-end
-
 function love.update(dt)
     Timer.update(dt)
     if EtatActuel.update then
