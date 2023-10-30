@@ -49,11 +49,15 @@ SONS = {
 }
 
 EtatActuel = nil
-EtatDebut = {}
-EtatNiveauSuivant = {}
-EtatCombat = {}
-EtatDefaite = {}
-EtatVictoire = {}
+EtatDebut = {
+    nom = "début"
+}
+EtatNiveauSuivant = {
+    nom = "niveau_suivant"
+}
+EtatCombat = { nom = "combat" }
+EtatDefaite = { nom = "défaite" }
+EtatVictoire = { nom = "victoire" }
 
 function love.load()
     love.window.setTitle(NOM)
@@ -214,7 +218,7 @@ function EtatNiveauSuivant:entrer()
 
     local fichierNiveau = string.format("niveaux/niveau-%03d.txt", NIVEAU_ACTUEL)
     local niveauInfo = love.filesystem.getInfo(fichierNiveau)
-    if not niveauInfo then
+    if niveauInfo == nil then
         -- On a fait le dernier niveau !
         changerEtat(EtatVictoire)
     else
@@ -313,6 +317,12 @@ function EtatCombat:update(dt)
                         end)
                         Timer.after(2 / 12, function() monstre.tailleY = 0 end)
                         monstre.vivant = false
+                        -- Est-ce que c'était le dernier monstre vivant ?
+                        if niveauGagne() then
+                            SONS.victoire:play()
+                            changerEtat(EtatNiveauSuivant)
+                        end
+                        -- Timer.after(2, function() changerEtat(EtatNiveauSuivant) end)
                     elseif testCollision(
                             joueur.x, joueur.y,
                             joueur.tailleX, joueur.tailleY,
@@ -326,6 +336,10 @@ function EtatCombat:update(dt)
                             [joueur] = { tailleX = 0, tailleY = 0 }
                         })
                         SONS.mort:play()
+                        -- Est-ce que c'était le dernier joueur vivant ?
+                        if niveauPerdu() then
+                            Timer.after(2, function() changerEtat(EtatDefaite) end)
+                        end
                     end
                 end
             end
@@ -333,29 +347,36 @@ function EtatCombat:update(dt)
     end
 
     -- Déplacements
-    local joueursVivants = 0
     for _, joueur in ipairs(JOUEURS) do
         if joueur.vivant then
-            joueursVivants = joueursVivants + 1
             deplacerObjet(joueur, dt)
         end
     end
-    local monstresVivants = 0
     for _, monstre in ipairs(MONSTRES) do
         if monstre.vivant then
-            monstresVivants = monstresVivants + 1
             deplacerObjet(monstre, dt)
         end
     end
+end
 
-    if joueursVivants == 0 then
-        -- TODO game over
-        Timer.after(2, function() changerEtat(EtatDefaite) end)
-    elseif monstresVivants == 0 then
-        -- victoire ! niveau suivant
-        SONS.victoire:play()
-        Timer.after(2, function() changerEtat(EtatNiveauSuivant) end)
+function niveauGagne()
+    -- Le niveau est gagné si tous les monstres sont morts.
+    for _, monstre in ipairs(MONSTRES) do
+        if monstre.vivant then
+            return false
+        end
     end
+    return true
+end
+
+function niveauPerdu()
+    -- Le niveau est perdu s'il n'y a plus un seul joueur vivant.
+    for _, joueur in ipairs(JOUEURS) do
+        if joueur.vivant then
+            return false
+        end
+    end
+    return true
 end
 
 function calculerVitesseMonstre(monstre, dt)
@@ -551,11 +572,6 @@ function EtatDefaite:dessiner()
     ecrire("appuie sur espace", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.8, 0.5)
 end
 
-function EtatVictoire:dessiner()
-    love.graphics.setColor(1, 1, 1)
-    ecrire("gg!", LARGEUR_JEU / 2, HAUTEUR_JEU / 2, 5)
-end
-
 function EtatVictoire:update(dt)
     -- TODO code dupliqué de EtatDefaite et EtatDebut
     local appuieStart = TOUCHES_PRESSEES["space"]
@@ -570,6 +586,11 @@ function EtatVictoire:update(dt)
     if appuieStart then
         changerEtat(EtatDebut)
     end
+end
+
+function EtatVictoire:dessiner()
+    love.graphics.setColor(1, 1, 1)
+    ecrire("gg!", LARGEUR_JEU / 2, HAUTEUR_JEU / 2, 5)
 end
 
 function ecrire(texte, x, y, echelle)
@@ -626,4 +647,3 @@ end
 function ControleurJoystick.saut(controleur)
     return controleur.joystick:isGamepadDown("a", "b")
 end
-
