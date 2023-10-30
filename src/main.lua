@@ -419,9 +419,9 @@ function calculerVitesse(objet, dt)
     end
 
     -- collisions avec les blocs
-    for y, ligne in ipairs(NIVEAU.blocs) do
-        for x, bloc in ipairs(ligne) do
-            if bloc == 1 then
+    for y = 1, #NIVEAU.blocs do
+        for x = 1, #NIVEAU.blocs[y] do
+            if NIVEAU.blocs[y][x] == 1 then
                 -- est-ce qu'il y a collision ?
                 if objet.vy > 0 and testCollision( -- dessous
                         objet.x, objet.y + objet.tailleY / 2 + objet.vy * dt / 2,
