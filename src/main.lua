@@ -29,7 +29,9 @@ ControleurAD = {
     nom = "ZAD",
     id = "ZAD"
 }
-ControleurJoystick = {}
+ControleurJoystick = {
+    nom = "JOY" -- TODO ajouter le nom de la manette?
+}
 TOUCHES_PRESSEES = {}
 
 -- Ne pas modifier ces variables, mais directement les fichiers
@@ -111,8 +113,6 @@ end
 function EtatDebut:entrer()
     SONS.musique_debut:play()
     SONS.musique_debut:setLooping(true)
-    -- TODO assigner le joystick1 par défaut sur une borne d'arcade
-    -- TODO assigner les flèches par défaut sur un clavier
 end
 
 function EtatDebut:update(dt)
@@ -122,16 +122,8 @@ function EtatDebut:update(dt)
     for _, joystick in ipairs(love.joystick.getJoysticks()) do
         local id = joystick:getID()
         if controleurDisponible(id) and joystick:isGamepadDown("a", "b", "start") then
-            -- TODO Ca c'est VRAIMENT moche.
-            local controleur = {
-                id = id,
-                nom = "JOY", -- TODO ajouter le nom de la manette?
-                joystick = joystick,
-                directionX = ControleurJoystick.directionX,
-                saut = ControleurJoystick.saut
-            }
             JOUEURS[#JOUEURS + 1] = {
-                controleur = controleur
+                controleur = creerControleurJoystick(joystick)
             }
             joystick:setVibration(1, 1)
             Timer.after(0.1, function() joystick:setVibration(0, 0) end)
@@ -243,7 +235,7 @@ function chargerNiveau(path)
             if caractere == "x" then
                 NIVEAU.blocs[y][x] = 1
             elseif caractere == "j" and #JOUEURS >= joueurCourant then
-                -- TODO IMPORTANT position des autres joueurs? C'est nécessaire pour jouer à plus que deux joueurs
+                -- TODO IMPORTANT position automatique des joueurs
                 local joueur = JOUEURS[joueurCourant]
                 joueur.x = x
                 joueur.y = y
@@ -506,7 +498,7 @@ function EtatCombat:dessiner()
     end
 
     if EtatCombat.pause then
-        ecrire("pause", LARGEUR_JEU/2, HAUTEUR_JEU/2, 1)
+        ecrire("pause", LARGEUR_JEU / 2, HAUTEUR_JEU / 2, 1)
     end
 end
 
@@ -632,7 +624,7 @@ end
 
 function ControleurAD:demarrer()
     -- note: même touche que le contrôleur avec des flèches
-    return TOUCHES_PRESSEES["start"]
+    return TOUCHES_PRESSEES["space"]
 end
 
 function ControleurJoystick.directionX(controleur)
@@ -650,4 +642,14 @@ end
 
 function ControleurJoystick.demarrer(controleur)
     return controleur.joystick:isGamepadDown("start")
+end
+
+function creerControleurJoystick(joystick)
+    local controleur = {}
+    for k, v in pairs(ControleurJoystick) do
+        controleur[k] = v
+    end
+    controleur.joystick = joystick
+    controleur.id = joystick:getID()
+    return controleur
 end
