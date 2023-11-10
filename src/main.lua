@@ -15,6 +15,8 @@ ECHELLE_DESSIN = 50
 LARGEUR_JEU = 800
 HAUTEUR_JEU = 600
 TYPO = love.graphics.newFont("typos/retro.ttf", 64)
+EPS = 1e-5
+COLLISION_TYPE = {NONE = 0, GROUND = 1, WALL = 2}
 
 -- Ne pas modifier ces variables
 NIVEAU_ACTUEL = 0
@@ -242,7 +244,8 @@ function chargerNiveau(path)
                     vivant = true,
                     tailleX = MONSTRES_TAILLE,
                     tailleY = MONSTRES_TAILLE,
-                    image = IMAGES.monstre
+                    image = IMAGES.monstre,
+                    collision_state = COLLISION_TYPE.NONE
                 }
             else
                 NIVEAU.blocs[y][x] = 0
@@ -287,11 +290,28 @@ function EtatCombat:update(dt)
     for _, joueur in ipairs(JOUEURS) do
         if joueur.vivant then
             calculerVitesseJoueur(joueur, dt)
+
+            joueur.collision_state, residual_dt, vitesse_slide_final = bouge_et_collisionne(joueur, dt)
+            joueur.vx = vitesse_slide_final.x
+            joueur.vy = vitesse_slide_final.y
+
+            collision2 = bouge_et_collisionne(joueur, residual_dt)
         end
     end
     for _, monstre in ipairs(MONSTRES) do
         if monstre.vivant then
             calculerVitesseMonstre(monstre, dt)
+
+            original_vx = monstre.vx
+            monstre.collision_state, residual_dt, vitesse_slide_final = bouge_et_collisionne(monstre, dt)
+            monstre.vx = vitesse_slide_final.x
+            monstre.vy = vitesse_slide_final.y
+
+            collision2 = bouge_et_collisionne(monstre, residual_dt)
+
+            if monstre.collision_state == COLLISION_TYPE.WALL or collision2 == COLLISION_TYPE.WALL then
+                monstre.vx = -original_vx
+            end
         end
     end
 
@@ -377,9 +397,10 @@ function niveauPerdu()
 end
 
 function calculerVitesseMonstre(monstre, dt)
-    if monstre.vx == 0 and testObjetSurLeSol(monstre) then
+    if monstre.vx == 0 and monstre.collision_state == COLLISION_TYPE.GROUND then
         -- quand le monstre est sur le sol avec une vitesse horizontale nulle, on le
         -- fait se déplacer dans une direction au hasard
+        monstre.vy = 0
         monstre.vx = (math.random(0, 1) * 2 - 1) * MONSTRES_VITESSE
     end
     local directionInitiale = signe(monstre.vx)
@@ -397,7 +418,7 @@ function calculerVitesseJoueur(joueur, dt)
     joueur.vx = joueur.controleur:directionX() * JOUEUR_VITESSE
 
     -- saut
-    if joueur.controleur:saut() and testObjetSurLeSol(joueur) then
+    if joueur.controleur:saut() and joueur.collision_state == COLLISION_TYPE.GROUND then
         -- TODO comment sauter plus haut en fonction de la durée pendant laquelle on appuie?
         joueur.vy = -JOUEUR_VITESSE_SAUT
         SONS.saut:play()
@@ -414,49 +435,139 @@ function calculerVitesse(objet, dt)
     if objet.vy > VITESSE_CHUTE_MAX then
         objet.vy = VITESSE_CHUTE_MAX
     end
+end
+
+function intersect_range(a_min, a_max, b_min, b_max)
+    r_min = math.max(a_min, b_min)
+    r_max = math.min(a_max, b_max)
+
+    return (r_min <= r_max)
+end
+
+
+function calcul_moving_boundaries(objet, dt)
+    xmin_objet = objet.x - objet.tailleX / 2
+    ymin_objet = objet.y - objet.tailleY / 2
+
+    xmax_objet = objet.x + objet.tailleX / 2
+    ymax_objet = objet.y + objet.tailleY / 2
+
+    if (objet.vx < 0) then
+        xmin_objet = xmin_objet + objet.vx * dt
+    else
+        xmax_objet = xmax_objet + objet.vx * dt
+    end
+
+    if (objet.vy < 0) then
+        ymin_objet = ymin_objet + objet.vy * dt
+    else
+        ymax_objet = ymax_objet + objet.vy * dt
+    end
+
+    return xmin_objet, xmax_objet, ymin_objet, ymax_objet
+end
+
+function calcul_static_boundaries(x, y, sx, sy)
+    return x - sx/2, x + sx / 2, y - sy / 2, y + sy / 2
+end
+
+function test_collision(objet, dt, x, y, sx, sy)
+    xmin_objet, xmax_objet, ymin_objet, ymax_objet = calcul_moving_boundaries(objet, dt)
+    xmin_avant, xmax_avant, ymin_avant, ymax_avant = calcul_static_boundaries(objet.x, objet.y, objet.tailleX, objet.tailleY)
+    xmin_apres, xmax_apres, ymin_apres, ymax_apres = calcul_static_boundaries(objet.x + objet.vx * dt, objet.y + objet.vy * dt, objet.tailleX, objet.tailleY)
+    xmin_bloc, xmax_bloc, ymin_bloc, ymax_bloc = calcul_static_boundaries(x, y, sx, sy)
+
+    ratio = 1
+    vitesse_slide = {x = objet.vx, y = objet.vy}
+    collision_type = COLLISION_TYPE.NONE
+
+    -- détection collision gauche-droite
+    if objet.vx > 0 and
+        (xmax_apres > xmin_bloc) and
+        (xmax_avant < xmin_bloc) and
+        intersect_range(ymin_objet, ymax_objet, ymin_bloc, ymax_bloc) then
+            ratio = (xmin_bloc - xmax_avant) / (xmax_apres - xmax_avant) - EPS
+            vitesse_slide.x = 0
+            collision_type = COLLISION_TYPE.WALL
+
+    -- détection collision droite-gauche
+    elseif objet.vx < 0 and
+        (xmin_apres < xmax_bloc) and
+        (xmin_avant > xmax_bloc) and
+        intersect_range(ymin_objet, ymax_objet, ymin_bloc, ymax_bloc) then
+            ratio = (xmax_bloc - xmin_avant) / (xmin_apres - xmin_avant) - EPS
+            vitesse_slide.x = 0
+            collision_type = COLLISION_TYPE.WALL
+
+    -- détection collision bas-haut
+    elseif objet.vy > 0 and
+        (ymax_apres > ymin_bloc) and
+        (ymax_avant < ymin_bloc) and
+        intersect_range(xmin_objet, xmax_objet, xmin_bloc, xmax_bloc) then
+            ratio = (ymin_bloc - ymax_avant) / (ymax_apres - ymax_avant) - EPS
+            vitesse_slide.y = 0
+            collision_type = COLLISION_TYPE.GROUND
+
+    -- détection collision haut-bas
+    elseif objet.vy < 0 and
+        (ymin_apres > ymax_bloc) and
+        (ymin_avant < ymax_bloc) and
+        intersect_range(xmin_objet, xmax_objet, xmin_bloc, xmax_bloc) then
+            ratio = (ymax_bloc - ymin_avant) / (ymin_apres - ymin_avant) - EPS
+            vitesse_slide.y = 0
+            collision_type = COLLISION_TYPE.NONE
+    end
+
+    ratio = math.max(0, ratio)  -- avoid negative ratio
+
+    return ratio, vitesse_slide, collision_type
+
+end
+
+function bouge_et_collisionne(objet, dt)
+    xmin_objet, xmax_objet, ymin_objet, ymax_objet = calcul_moving_boundaries(objet, dt)
+
+    index_xmin = math.floor(xmin_objet)
+    index_xmax = math.ceil(xmax_objet)
+    index_ymin = math.floor(ymin_objet)
+    index_ymax = math.ceil(ymax_objet)
+
+    ratio_final = 1
+    vitesse_slide_final = {x = objet.vx, y = objet.vy}
+    local collision_type = COLLISION_TYPE.NONE
 
     -- collisions avec les blocs
-    for y = 1, #NIVEAU.blocs do
-        for x = 1, #NIVEAU.blocs[y] do
-            if NIVEAU.blocs[y][x] == 1 then
-                -- est-ce qu'il y a collision ?
-                if objet.vy > 0 and testCollision( -- dessous
-                        objet.x, objet.y + objet.tailleY / 2 + objet.vy * dt / 2,
-                        objet.tailleX, objet.vy * dt,
-                        x, y, 1, 1
-                    ) then
-                    objet.vy = (y - 1 / 2 - objet.tailleY / 2 - objet.y) / dt
-                end
-                if objet.vy < 0 and testCollision( -- dessus
-                        objet.x, objet.y - objet.tailleY / 2 + objet.vy * dt / 2,
-                        objet.tailleX, -objet.vy * dt,
-                        x, y, 1, 1
-                    ) then
-                    objet.vy = (y + 1 / 2 + objet.tailleY / 2 - objet.y) / dt
-                end
-                if objet.vx > 0 and testCollision( -- droite
-                        objet.x + objet.tailleX / 2 + objet.vx * dt / 2, objet.y,
-                        objet.vx * dt, objet.tailleY,
-                        x, y, 1, 1
-                    ) then
-                    objet.vx = (x - 1 / 2 - objet.tailleX / 2 - objet.x) / dt
-                end
-                if objet.vx < 0 and testCollision( -- gauche
-                        objet.x - objet.tailleX / 2 + objet.vx * dt / 2, objet.y,
-                        -objet.vx * dt, objet.tailleY,
-                        x, y, 1, 1
-                    ) then
-                    objet.vx = (x + 1 / 2 + objet.tailleX / 2 - objet.x) / dt
+    for y = index_ymin, index_ymax do
+        if y < 1 or y > #NIVEAU.blocs then
+        else
+            for x = index_xmin, index_xmax do
+                if x < 1 or x > #NIVEAU.blocs[y] then
+                else
+                    if NIVEAU.blocs[y][x] == 1 then
+                        ratio, vitesse_slide, tmp_collision = test_collision(objet, dt, x, y, 1, 1)
+                        if ratio < ratio_final then
+                            ratio_final = ratio
+                            vitesse_slide_final = vitesse_slide
+                            collision_type = tmp_collision
+                        end
+                    end
                 end
             end
         end
     end
+
+    objet.x = objet.x + ratio_final * dt * objet.vx
+    objet.y = objet.y + ratio_final * dt * objet.vy
+
+    residual_dt = dt * (1 - ratio_final)
+
+    return collision_type, residual_dt, vitesse_slide_final
 end
 
 function deplacerObjet(objet, dt)
     -- déplacement
-    objet.x = objet.x + objet.vx * dt
-    objet.y = objet.y + objet.vy * dt
+    next_pos_x = objet.x + objet.vx * dt
+    next_pos_y = objet.y + objet.vy * dt
 
     -- on garde l'objet dans les bornes du terrain
     objet.x = math.min(NIVEAU.tailleX, math.max(1, objet.x))
