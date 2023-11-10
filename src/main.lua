@@ -53,7 +53,10 @@ EtatDebut = {
 EtatNiveauSuivant = {
     nom = "niveau_suivant"
 }
-EtatCombat = { nom = "combat" }
+EtatCombat = {
+    nom = "combat",
+    pause = false
+}
 EtatDefaite = { nom = "défaite" }
 EtatVictoire = { nom = "victoire" }
 
@@ -92,12 +95,7 @@ function love.resize(largeur, hauteur)
 end
 
 function love.keypressed(touche)
-    -- TODO gérer les pauses
     TOUCHES_PRESSEES[touche] = true
-    if touche == "escape" then
-        -- TODO vraiment?
-        love.event.quit()
-    end
 end
 
 function changerEtat(nouvelEtat)
@@ -277,6 +275,14 @@ function chargerNiveau(path)
 end
 
 function EtatCombat:update(dt)
+    -- Appuyer sur pause
+    if joueursAppuientSurDemarrer() then
+        EtatCombat.pause = not EtatCombat.pause
+    end
+    if EtatCombat.pause then
+        return
+    end
+
     -- Calcul des vitesses
     for _, joueur in ipairs(JOUEURS) do
         if joueur.vivant then
@@ -497,6 +503,10 @@ function EtatCombat:dessiner()
     end
     for _, joueur in ipairs(JOUEURS) do
         dessinerObjet(joueur)
+    end
+
+    if EtatCombat.pause then
+        ecrire("pause", LARGEUR_JEU/2, HAUTEUR_JEU/2, 1)
     end
 end
 
