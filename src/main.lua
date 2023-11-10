@@ -18,7 +18,6 @@ TYPO = love.graphics.newFont("typos/retro.ttf", 64)
 
 -- Ne pas modifier ces variables
 NIVEAU_ACTUEL = 0
-MENU_JOUEUR_SELECTIONNE = 1
 NIVEAU = {}
 JOUEURS = {}
 MONSTRES = {}
@@ -31,7 +30,6 @@ ControleurAD = {
     id = "ZAD"
 }
 ControleurJoystick = {}
-CONTROLEURS = {}
 TOUCHES_PRESSEES = {}
 
 -- Ne pas modifier ces variables, mais directement les fichiers
@@ -117,63 +115,56 @@ function EtatDebut:entrer()
     SONS.musique_debut:setLooping(true)
     -- TODO assigner le joystick1 par défaut sur une borne d'arcade
     -- TODO assigner les flèches par défaut sur un clavier
-    CONTROLEURS = {}
-    MENU_JOUEUR_SELECTIONNE = 1
 end
 
 function EtatDebut:update(dt)
+    local nombreDeJoueurs = #JOUEURS
+
     -- Selection du joueur
     for _, joystick in ipairs(love.joystick.getJoysticks()) do
-        if joystick:isGamepadDown("a", "b") then
-            local id = joystick:getID()
-            if controleurDisponible(id) then
-                -- TODO Ca c'est VRAIMENT moche.
-                local controleur = {
-                    id = id,
-                    nom = "JOY", -- TODO ajouter le nom de la manette?
-                    joystick = joystick,
-                    directionX = ControleurJoystick.directionX,
-                    saut = ControleurJoystick.saut
-                }
-                CONTROLEURS[#CONTROLEURS + 1] = controleur
-                joystick:setVibration(1, 1)
-                Timer.after(0.1, function() joystick:setVibration(0, 0) end)
-            end
+        local id = joystick:getID()
+        if controleurDisponible(id) and joystick:isGamepadDown("a", "b", "start") then
+            -- TODO Ca c'est VRAIMENT moche.
+            local controleur = {
+                id = id,
+                nom = "JOY", -- TODO ajouter le nom de la manette?
+                joystick = joystick,
+                directionX = ControleurJoystick.directionX,
+                saut = ControleurJoystick.saut
+            }
+            JOUEURS[#JOUEURS + 1] = {
+                controleur = controleur
+            }
+            joystick:setVibration(1, 1)
+            Timer.after(0.1, function() joystick:setVibration(0, 0) end)
         end
     end
-    if TOUCHES_PRESSEES["space"] or TOUCHES_PRESSEES["rctrl"] then
-        -- Est-ce que les flèches sont disponibles ?
-        if controleurDisponible(ControleurFleches.id) then
-            CONTROLEURS[#CONTROLEURS + 1] = ControleurFleches
-        end
+    if controleurDisponible(ControleurFleches.id) and (ControleurFleches:demarrer() or ControleurFleches:saut()) then
+        JOUEURS[#JOUEURS + 1] = {
+            controleur = ControleurFleches
+        }
     end
-    if TOUCHES_PRESSEES["a"] or TOUCHES_PRESSEES["q"] or TOUCHES_PRESSEES["z"] or TOUCHES_PRESSEES["s"] or TOUCHES_PRESSEES["d"] then
-        -- Est-ce que les flèches sont disponibles ?
-        if controleurDisponible(ControleurAD.id) then
-            CONTROLEURS[#CONTROLEURS + 1] = ControleurAD
-        end
+    if controleurDisponible(ControleurAD.id) and ControleurAD:directionX() ~= 0 or ControleurAD:saut() then
+        JOUEURS[#JOUEURS + 1] = {
+            controleur = ControleurAD
+        }
     end
 
-    -- On part au combat
-    local appuieStart = TOUCHES_PRESSEES["return"]
-    for _, joystick in ipairs(love.joystick:getJoysticks()) do
-        if joystick:isGamepadDown("start") then
-            appuieStart = true
-        end
-    end
-    if #CONTROLEURS > 0 and appuieStart then
+    -- On regarde si aucun joueur n'a été ajouté (notamment en appuyant sur demarrer)
+    if #JOUEURS > 0 and #JOUEURS == nombreDeJoueurs and joueursAppuientSurDemarrer() then
+        -- On part au combat
         changerEtat(EtatNiveauSuivant)
     end
 end
 
 function controleurDisponible(id)
     -- retourne true si le controleur peut être assigné à un joueur
-    if #CONTROLEURS == 4 then
+    if #JOUEURS == 4 then
         -- Seulement quatre joueurs supportés...
         return false
     end
-    for _, controleur in ipairs(CONTROLEURS) do
-        if controleur.id == id then
+    for _, joueur in ipairs(JOUEURS) do
+        if joueur.controleur.id == id then
             return false
         end
     end
@@ -184,27 +175,29 @@ function EtatDebut:dessiner()
     love.graphics.setColor(1, 1, 0)
     ecrire(NOM, LARGEUR_JEU / 2, HAUTEUR_JEU * 0.3, 2)
     love.graphics.setColor(1, 1, 1)
-    if #CONTROLEURS > 0 then
-        for c, controleur in ipairs(CONTROLEURS) do
-            love.graphics.setColor(1, 1, 1)
-            ecrire(
-                string.format("player %d - %s", c, controleur.nom),
-                LARGEUR_JEU / 2, HAUTEUR_JEU * (0.5 + c * 0.05),
-                0.3
-            )
-        end
+
+    for j, joueur in ipairs(JOUEURS) do
+        love.graphics.setColor(1, 1, 1)
+        ecrire(
+            string.format("player %d - %s", j, joueur.controleur.nom),
+            LARGEUR_JEU / 2, HAUTEUR_JEU * (0.5 + j * 0.05),
+            0.3
+        )
+    end
+    for j = #JOUEURS + 1, 4 do
+        love.graphics.setColor(0.5, 0.5, 0.5)
+        ecrire(
+            string.format("player %d", j),
+            LARGEUR_JEU / 2, HAUTEUR_JEU * (0.5 + j * 0.05),
+            0.3
+        )
+    end
+
+    if #JOUEURS > 0 then
         ecrire("press start", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.8, 0.5)
     else
         love.graphics.setColor(1, 1, 1)
         ecrire("en attente de joueurs...", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.8, 0.3)
-    end
-    for c = #CONTROLEURS + 1, 4 do
-        love.graphics.setColor(0.5, 0.5, 0.5)
-        ecrire(
-            string.format("player %d", c),
-            LARGEUR_JEU / 2, HAUTEUR_JEU * (0.5 + c * 0.05),
-            0.3
-        )
     end
 end
 
@@ -239,11 +232,11 @@ function EtatNiveauSuivant:dessiner()
 end
 
 function chargerNiveau(path)
-    JOUEURS = {}
     NIVEAU = {}
     MONSTRES = {}
     NIVEAU.blocs = {}
     NIVEAU.tailleX = 0
+    local joueurCourant = 1
     local y = 1
     for line in love.filesystem.lines(path) do
         NIVEAU.blocs[y] = {}
@@ -251,19 +244,18 @@ function chargerNiveau(path)
             local caractere = line:sub(x, x)
             if caractere == "x" then
                 NIVEAU.blocs[y][x] = 1
-            elseif caractere == "j" and #CONTROLEURS > #JOUEURS then
-                -- TODO position des autres joueurs?
-                JOUEURS[#JOUEURS + 1] = {
-                    x = x,
-                    y = y,
-                    vx = 0,
-                    vy = 0,
-                    vivant = true,
-                    tailleX = JOUEUR_TAILLE,
-                    tailleY = JOUEUR_TAILLE,
-                    image = IMAGES.joueur,
-                    controleur = CONTROLEURS[#JOUEURS + 1]
-                }
+            elseif caractere == "j" and #JOUEURS >= joueurCourant then
+                -- TODO IMPORTANT position des autres joueurs? C'est nécessaire pour jouer à plus que deux joueurs
+                local joueur = JOUEURS[joueurCourant]
+                joueur.x = x
+                joueur.y = y
+                joueur.vx = 0
+                joueur.vy = 0
+                joueur.vivant = true
+                joueur.tailleX = JOUEUR_TAILLE
+                joueur.tailleY = JOUEUR_TAILLE
+                joueur.image = IMAGES.joueur
+                joueurCourant = joueurCourant + 1
             elseif caractere == "m" then
                 MONSTRES[#MONSTRES + 1] = {
                     x = x,
@@ -320,9 +312,8 @@ function EtatCombat:update(dt)
                         -- Est-ce que c'était le dernier monstre vivant ?
                         if niveauGagne() then
                             SONS.victoire:play()
-                            changerEtat(EtatNiveauSuivant)
+                            Timer.after(2, function() changerEtat(EtatNiveauSuivant) end)
                         end
-                        -- Timer.after(2, function() changerEtat(EtatNiveauSuivant) end)
                     elseif testCollision(
                             joueur.x, joueur.y,
                             joueur.tailleX, joueur.tailleY,
@@ -552,16 +543,7 @@ function EtatDefaite:entrer(dt)
 end
 
 function EtatDefaite:update(dt)
-    local appuieStart = TOUCHES_PRESSEES["space"]
-    if TOUCHES_PRESSEES["return"] then
-        appuieStart = true
-    end
-    for _, joystick in ipairs(love.joystick:getJoysticks()) do
-        if joystick:isGamepadDown("start") then
-            appuieStart = true
-        end
-    end
-    if appuieStart then
+    if joueursAppuientSurDemarrer() then
         changerEtat(EtatDebut)
     end
 end
@@ -569,21 +551,11 @@ end
 function EtatDefaite:dessiner()
     love.graphics.setColor(1, 1, 1)
     ecrire("Game\nOver", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.3, 2)
-    ecrire("appuie sur espace", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.8, 0.5)
+    ecrire("press start", LARGEUR_JEU / 2, HAUTEUR_JEU * 0.8, 0.5)
 end
 
 function EtatVictoire:update(dt)
-    -- TODO code dupliqué de EtatDefaite et EtatDebut
-    local appuieStart = TOUCHES_PRESSEES["space"]
-    if TOUCHES_PRESSEES["return"] then
-        appuieStart = true
-    end
-    for _, joystick in ipairs(love.joystick:getJoysticks()) do
-        if joystick:isGamepadDown("start") then
-            appuieStart = true
-        end
-    end
-    if appuieStart then
+    if joueursAppuientSurDemarrer() then
         changerEtat(EtatDebut)
     end
 end
@@ -605,6 +577,15 @@ function ecrire(texte, x, y, echelle)
     )
 end
 
+function joueursAppuientSurDemarrer()
+    for _, joueur in ipairs(JOUEURS) do
+        if joueur.controleur:demarrer() then
+            return true
+        end
+    end
+    return false
+end
+
 function ControleurFleches:directionX()
     local dirX = 0
     if love.keyboard.isDown("left") then
@@ -617,7 +598,11 @@ function ControleurFleches:directionX()
 end
 
 function ControleurFleches:saut()
-    return TOUCHES_PRESSEES["rctrl"] or TOUCHES_PRESSEES["space"]
+    return TOUCHES_PRESSEES["rctrl"]
+end
+
+function ControleurFleches:demarrer()
+    return TOUCHES_PRESSEES["return"]
 end
 
 function ControleurAD:directionX()
@@ -635,6 +620,11 @@ function ControleurAD:saut()
     return TOUCHES_PRESSEES["lshift"]
 end
 
+function ControleurAD:demarrer()
+    -- note: même touche que le contrôleur avec des flèches
+    return TOUCHES_PRESSEES["start"]
+end
+
 function ControleurJoystick.directionX(controleur)
     local dirX = controleur.joystick:getGamepadAxis("leftx")
     if math.abs(dirX) < 0.2 then
@@ -646,4 +636,8 @@ end
 
 function ControleurJoystick.saut(controleur)
     return controleur.joystick:isGamepadDown("a", "b")
+end
+
+function ControleurJoystick.demarrer(controleur)
+    return controleur.joystick:isGamepadDown("start")
 end
