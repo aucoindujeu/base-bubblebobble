@@ -226,7 +226,6 @@ function chargerNiveau(path)
     MONSTRES = {}
     NIVEAU.blocs = {}
     NIVEAU.tailleX = 0
-    local joueurCourant = 1
     local y = 1
     for line in love.filesystem.lines(path) do
         NIVEAU.blocs[y] = {}
@@ -234,18 +233,6 @@ function chargerNiveau(path)
             local caractere = line:sub(x, x)
             if caractere == "x" then
                 NIVEAU.blocs[y][x] = 1
-            elseif caractere == "j" and #JOUEURS >= joueurCourant then
-                -- TODO IMPORTANT position automatique des joueurs
-                local joueur = JOUEURS[joueurCourant]
-                joueur.x = x
-                joueur.y = y
-                joueur.vx = 0
-                joueur.vy = 0
-                joueur.vivant = true
-                joueur.tailleX = JOUEUR_TAILLE
-                joueur.tailleY = JOUEUR_TAILLE
-                joueur.image = IMAGES.joueur
-                joueurCourant = joueurCourant + 1
             elseif caractere == "m" then
                 MONSTRES[#MONSTRES + 1] = {
                     x = x,
@@ -264,6 +251,27 @@ function chargerNiveau(path)
         end
         y = y + 1
     end
+
+    -- Positionnement des joueurs
+    for j, joueur in ipairs(JOUEURS) do
+        local x = math.floor((NIVEAU.tailleX - 1) * j / (#JOUEURS + 1)) + 1
+        local y = #NIVEAU.blocs - 2
+        while NIVEAU.blocs[y][x] == 1 do
+            y = (y - 1) % #NIVEAU.blocs
+        end
+        joueur.x = x
+        joueur.y = y
+        joueur.vx = 0
+        joueur.vy = 0
+        joueur.vivant = true
+        joueur.tailleX = JOUEUR_TAILLE
+        joueur.tailleY = JOUEUR_TAILLE
+        joueur.image = IMAGES.joueur
+    end
+end
+
+function EtatCombat:entrer()
+    EtatCombat.pause = false
 end
 
 function EtatCombat:update(dt)
