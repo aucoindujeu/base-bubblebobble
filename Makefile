@@ -3,7 +3,7 @@ play:
 
 love:
 	mkdir -p dist
-	cd src && zip -r ../dist/projetvide.love .
+	cd src && zip -r ../dist/base-bubblebobble.love .
 
 js: love
-	love.js -c --title="Projet vide" ./dist/projetvide.love ./dist/js
+	love.js -c --title="Projet vide" ./dist/base-bubblebobble.love ./dist/js
