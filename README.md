@@ -2,6 +2,8 @@
 
 Ceci est un squelette de jeu inspiré par Bubble Bobble et à destination des ateliers d'initiation à la programmation organisés par la ludothèque de Briançon [Au Coin du Jeu](https://www.aucoindujeu05.fr/).
 
+La version de base du jeu est jouable en ligne : https://aucoindujeu.github.io/base-bubblebobble/ Ne vous étonnez pas si tout est blanc et silencieux, c'est justement le but de ce projet !
+
 ## Instructions
 
 Lancer le jeu:
