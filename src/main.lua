@@ -239,6 +239,7 @@ function chargerNiveau(path)
                     y = y,
                     vx = 0,
                     vy = 0,
+                    orientationX = 0,
                     vivant = true,
                     tailleX = MONSTRES_TAILLE,
                     tailleY = MONSTRES_TAILLE,
@@ -263,6 +264,7 @@ function chargerNiveau(path)
         joueur.y = y
         joueur.vx = 0
         joueur.vy = 0
+        joueur.orientationX = 1
         joueur.vivant = true
         joueur.tailleX = JOUEUR_TAILLE
         joueur.tailleY = JOUEUR_TAILLE
@@ -454,6 +456,13 @@ function calculerVitesse(objet, dt)
 end
 
 function deplacerObjet(objet, dt)
+    -- on définit l'orientation
+    if objet.vx < 0 then
+        objet.orientationX = -1
+    elseif objet.vx > 0 then
+        objet.orientationX = 1
+    end
+
     -- déplacement
     objet.x = objet.x + objet.vx * dt
     objet.y = objet.y + objet.vy * dt
@@ -521,12 +530,14 @@ function dessinerNiveau()
 end
 
 function dessinerObjet(objet)
-    local echelleX = 1
-    local echelleY = 1
-    if objet.vx < 0 then
-        echelleX = -1
+    -- Quand l'objet est tourné à gauche, il faut modifier la position
+    local echelleX = objet.orientationX
+    local x = objet.x
+    if echelleX < 0 then
+        x = x + objet.tailleX
     end
-    dessinerImage(objet.x, objet.y, objet.tailleX, objet.tailleY, objet.image, echelleX, echelleY)
+    local echelleY = 1
+    dessinerImage(x, objet.y, objet.tailleX, objet.tailleY, objet.image, echelleX, echelleY)
 end
 
 function dessinerImage(x, y, tailleX, tailleY, image, echelleX, echelleY)
