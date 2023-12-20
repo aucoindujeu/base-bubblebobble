@@ -9,7 +9,8 @@ JOUEUR_VITESSE = 8
 JOUEUR_VITESSE_SAUT = 20
 JOUEUR_TAILLE = 0.9
 MONSTRES_VITESSE = JOUEUR_VITESSE * 0.5
-MONSTRES_TAILLE = 0.8
+MONSTRES_TAILLEX = 0.8
+MONSTRES_TAILLEY = 0.8
 VITESSE_CHUTE_MAX = 10
 ECHELLE_DESSIN = 50
 LARGEUR_JEU = 800
@@ -241,8 +242,8 @@ function chargerNiveau(path)
                     vy = 0,
                     orientationX = 0,
                     vivant = true,
-                    tailleX = MONSTRES_TAILLE,
-                    tailleY = MONSTRES_TAILLE,
+                    tailleX = MONSTRES_TAILLEX,
+                    tailleY = MONSTRES_TAILLEY,
                     image = IMAGES.monstre
                 }
             else
