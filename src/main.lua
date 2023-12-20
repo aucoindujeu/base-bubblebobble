@@ -521,10 +521,17 @@ function dessinerNiveau()
 end
 
 function dessinerObjet(objet)
-    dessinerImage(objet.x, objet.y, objet.tailleX, objet.tailleY, objet.image)
+    local echelleX = 1
+    local echelleY = 1
+    if objet.vx < 0 then
+        echelleX = -1
+    end
+    dessinerImage(objet.x, objet.y, objet.tailleX, objet.tailleY, objet.image, echelleX, echelleY)
 end
 
-function dessinerImage(x, y, tailleX, tailleY, image)
+function dessinerImage(x, y, tailleX, tailleY, image, echelleX, echelleY)
+    echelleX = echelleX or 1
+    echelleY = echelleY or 1
     local echelle = math.min(LARGEUR_JEU / NIVEAU.tailleX, HAUTEUR_JEU / #NIVEAU.blocs)
     local offsetX = (LARGEUR_JEU - NIVEAU.tailleX * echelle) / 2
     local offsetY = (HAUTEUR_JEU - #NIVEAU.blocs * echelle) / 2
@@ -533,8 +540,8 @@ function dessinerImage(x, y, tailleX, tailleY, image)
         (x - 1 - tailleX / 2) * echelle + offsetX,
         (y - 1 - tailleY / 2) * echelle + offsetY,
         0,                                      -- orientation
-        (tailleX / image:getWidth()) * echelle, -- scaleX
-        (tailleY / image:getHeight()) * echelle -- scaleY
+        (tailleX / image:getWidth()) * echelle * echelleX, -- scaleX
+        (tailleY / image:getHeight()) * echelle * echelleY -- scaleY
     )
 end
 
