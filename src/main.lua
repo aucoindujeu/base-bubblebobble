@@ -257,7 +257,7 @@ function chargerNiveau(path)
         local x = math.floor((NIVEAU.tailleX - 1) * j / (#JOUEURS + 1)) + 1
         local y = #NIVEAU.blocs - 2
         while y ~= 1 and NIVEAU.blocs[y][x] == 1 do
-            y = (y - 1) % #NIVEAU.blocs + 1
+            y = (y - 2) % #NIVEAU.blocs + 1
         end
         joueur.x = x
         joueur.y = y
