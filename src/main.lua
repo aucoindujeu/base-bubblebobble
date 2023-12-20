@@ -256,8 +256,8 @@ function chargerNiveau(path)
     for j, joueur in ipairs(JOUEURS) do
         local x = math.floor((NIVEAU.tailleX - 1) * j / (#JOUEURS + 1)) + 1
         local y = #NIVEAU.blocs - 2
-        while NIVEAU.blocs[y][x] == 1 do
-            y = (y - 1) % #NIVEAU.blocs
+        while y ~= 1 and NIVEAU.blocs[y][x] == 1 do
+            y = (y - 1) % #NIVEAU.blocs + 1
         end
         joueur.x = x
         joueur.y = y
